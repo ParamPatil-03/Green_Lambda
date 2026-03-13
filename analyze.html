@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Code Analysis | Green Lambda</title>
+    <meta name="description"
+        content="Machine Learning-driven energy prediction framework for serverless workloads. Predict energy consumption before deployment.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@300;400;500;600&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="style.css?v=8">
+    <style>
+        .analyze-main {
+            padding-top: 120px;
+            min-height: calc(100vh - 80px);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+        }
+
+        .analyze-main::before {
+            content: '';
+            position: absolute;
+            top: 20%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 800px;
+            height: 800px;
+            background: radial-gradient(circle, rgba(200, 255, 0, 0.05) 0%, transparent 70%);
+            filter: blur(60px);
+            pointer-events: none;
+            z-index: -1;
+            animation: pulseGlow 8s infinite alternate;
+        }
+
+        @keyframes pulseGlow {
+            0% {
+                transform: translate(-50%, -50%) scale(1);
+                opacity: 0.5;
+            }
+
+            100% {
+                transform: translate(-50%, -50%) scale(1.2);
+                opacity: 1;
+            }
+        }
+
+        .editor-container {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 2rem;
+            width: 100%;
+            max-width: 100%;
+            margin: 0 auto;
+            position: relative;
+        }
+
+        .editor-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .editor-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .editor-title svg {
+            color: var(--accent);
+            width: 24px;
+            height: 24px;
+        }
+
+        .code-textarea {
+            width: 100%;
+            height: 400px;
+            background: #0d0d0d;
+            border: 1px solid var(--border-h);
+            border-radius: 8px;
+            color: var(--text);
+            font-family: var(--mono);
+            font-size: 0.9rem;
+            padding: 1.5rem;
+            resize: vertical;
+            outline: none;
+            transition: border-color 0.3s var(--ease), box-shadow 0.3s var(--ease);
+        }
+
+        .code-textarea:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 15px rgba(200, 255, 0, 0.1);
+        }
+
+        .editor-footer {
+            margin-top: 1.5rem;
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        .language-select {
+            background: #0d0d0d;
+            border: 1px solid var(--border-h);
+            color: var(--text);
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            font-family: var(--font);
+            font-size: 0.9rem;
+            outline: none;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Loader removed for instant access -->
+
+    <nav class="nav" id="nav">
+        <div class="nav-inner">
+            <a href="index.html" class="nav-logo">
+                <span class="logo-mark">⚡</span>
+                <span class="logo-text">Green Lambda</span>
+            </a>
+            <div class="nav-links" id="navLinks">
+                <a href="index.html#hero" class="nav-link">
+                    <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                        xmlns="http://www.w3.org/2000/svg" stroke-width="2.5" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                    </svg> Home
+                </a>
+            </div>
+            <button class="nav-toggle" id="navToggle" aria-label="Toggle menu">
+                <span></span><span></span><span></span>
+            </button>
+        </div>
+    </nav>
+
+    <main class="analyze-main">
+        <!-- RequireJS config injected here, loads Monaco -->
+        <!-- Load GSAP before RequireJS so it attaches to window.gsap instead of AMD -->
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+        <!-- Load Monaco Editor -->
+        <script>var require = { paths: { 'vs': 'node_modules/monaco-editor/min/vs' } };</script>
+        <script src="node_modules/monaco-editor/min/vs/loader.js"></script>
+
+        <div class="editor-layout container" style="max-width: 95%; width: 100%;">
+
+            <!-- Code Editor Panel -->
+            <div class="editor-container reveal" id="editorWrap">
+                <div class="analysis-loader" id="aiLoader">
+                    <div class="ai-core">
+                        <div class="ai-ring"></div>
+                        <div class="ai-ring"></div>
+                    </div>
+                    <div class="ai-text" id="aiSteps">Initializing AST Parser...</div>
+                </div>
+                <div class="editor-header">
+                    <div class="editor-title">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+                            <polyline points="16 18 22 12 16 6"></polyline>
+                            <polyline points="8 6 2 12 8 18"></polyline>
+                        </svg>
+                        Function Inspector
+                    </div>
+                    <div style="display: flex; gap: 1rem;">
+                        <button class="ms-btn" id="clearBtn">Clear</button>
+                        <select class="language-select" id="langSelect">
+                            <option value="python">Python 3.11</option>
+                            <option value="javascript">Node.js 20</option>
+                            <option value="go">Go 1.21</option>
+                            <option value="java">Java 21</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div id="monaco-editor"></div>
+
+                <!-- Auto Extracted Static Metrics -->
+                <div class="static-stats-grid">
+                    <div class="stat-box">
+                        <div class="flex-header" style="margin:0; padding:0; border:none;">
+                            <div class="stat-box-lbl">Complexity Score</div>
+                            <span class="complexity-badge comp-med">Medium</span>
+                        </div>
+                        <div class="stat-box-val" id="st-cc">v = 14</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-box-lbl">I/O & API Calls</div>
+                        <div class="stat-box-val" id="st-io">3 sync ops</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-box-lbl">Lines / Loop Depth</div>
+                        <div class="stat-box-val" id="st-lines">142 L / 2D</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-box-lbl">Memory Indicators</div>
+                        <div class="stat-box-val" id="st-mem">High Arr[]</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="flex-header" style="margin:0; padding:0; border:none;">
+                            <div class="stat-box-lbl">Estimated Runtime</div>
+                            <span class="complexity-badge" id="runtimeBadge"
+                                style="background:#36f9ae; color:#111;">FAST</span>
+                        </div>
+                        <div class="stat-box-val" id="st-runtime">~186 ms</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-box-lbl">Loop Count</div>
+                        <div class="stat-box-val" id="st-loop-count">0 loops</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Metadata & Controls Panel -->
+            <div class="metadata-panel reveal">
+                <h3 style="margin-bottom: 1.5rem; font-size:1.1rem; display:flex; align-items:center; gap:8px;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3"></circle>
+                        <path
+                            d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z">
+                        </path>
+                    </svg> Dynamic Properties
+                </h3>
+
+                <div class="form-group">
+                    <label class="form-label">Platform Topology</label>
+                    <select class="form-control" id="platformSel">
+                        <option>AWS Lambda</option>
+                        <option>Azure Functions</option>
+                        <option>Google Cloud Functions</option>
+                        <option>OpenFaaS / KNative</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Memory Provisioned <span class="range-val" id="memLbl">1024
+                            MB</span></label>
+                    <input type="range" class="form-range" id="memSlider" min="128" max="3008" step="128" value="1024">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Expected Frequency <span class="range-val" id="freqLbl">2,500 /
+                            hr</span></label>
+                    <input type="range" class="form-range" id="freqSlider" min="100" max="50000" step="100"
+                        value="2500">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Hard Timeout <span class="range-val" id="timeLbl">30 sec</span></label>
+                    <input type="range" class="form-range" id="timeSlider" min="1" max="900" step="1" value="30">
+                </div>
+
+                <div class="form-group toggle-container"
+                    style="margin-top: 1.5rem; flex-direction: column; align-items: flex-start; gap: 1rem;">
+                    <div style="font-size: 0.85rem;">Include Cold Start Penalty<br><span
+                            style="color:var(--text-3); font-size:0.75rem;">Models V8 VM spin-up cost</span></div>
+                    <label class="bb8-toggle">
+                        <input class="bb8-toggle__checkbox" type="checkbox" id="coldToggle" checked>
+                        <div class="bb8-toggle__container">
+                            <div class="bb8-toggle__scenery">
+                                <div class="bb8-toggle__star"></div>
+                                <div class="bb8-toggle__star"></div>
+                                <div class="bb8-toggle__star"></div>
+                                <div class="bb8-toggle__star"></div>
+                                <div class="bb8-toggle__star"></div>
+                                <div class="bb8-toggle__star"></div>
+                                <div class="bb8-toggle__star"></div>
+                                <div class="tatto-1"></div>
+                                <div class="tatto-2"></div>
+                                <div class="gomrassen"></div>
+                                <div class="hermes"></div>
+                                <div class="chenini"></div>
+                                <div class="bb8-toggle__cloud"></div>
+                                <div class="bb8-toggle__cloud"></div>
+                                <div class="bb8-toggle__cloud"></div>
+                            </div>
+                            <div class="bb8">
+                                <div class="bb8__head-container">
+                                    <div class="bb8__antenna"></div>
+                                    <div class="bb8__antenna"></div>
+                                    <div class="bb8__head"></div>
+                                </div>
+                                <div class="bb8__body"></div>
+                            </div>
+                            <div class="artificial__hidden">
+                                <div class="bb8__shadow"></div>
+                            </div>
+                        </div>
+                    </label>
+                </div>
+
+                <div class="wheel-selector" style="margin-top: 3rem; margin-bottom: 2rem;">
+                    <div class="hint-pop">SELECT MODEL</div>
+                    <div class="radio-input">
+                        <label for="value-2" class="next-trigger" id="trigger-for-1"></label>
+                        <label for="value-3" class="next-trigger" id="trigger-for-2"></label>
+                        <label for="value-1" class="next-trigger" id="trigger-for-3"></label>
+
+                        <div class="glass-overlay"></div>
+
+                        <input value="value-1" name="value-radio" id="value-1" type="radio" checked="" />
+                        <label class="wheel-label" for="value-1" style="--angle: -36deg">
+                            <span class="num">01</span>
+                            <span class="label">XGBoost</span>
+                        </label>
+
+                        <input value="value-2" name="value-radio" id="value-2" type="radio" />
+                        <label class="wheel-label" for="value-2" style="--angle: 0deg">
+                            <span class="num">02</span>
+                            <span class="label" style="font-size:1.4rem;">RF Forest</span>
+                        </label>
+
+                        <input value="value-3" name="value-radio" id="value-3" type="radio" />
+                        <label class="wheel-label" for="value-3" style="--angle: 36deg">
+                            <span class="num">03</span>
+                            <span class="label" style="font-size:1.4rem;">Neural Net</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="analyze-btn-wrap">
+                    <button type="button" class="btn btn-primary" id="analyzeBtn">
+                        <span class="fold"></span>
+                        <div class="points_wrapper"><i class="point"></i><i class="point"></i><i class="point"></i><i
+                                class="point"></i><i class="point"></i><i class="point"></i><i class="point"></i><i
+                                class="point"></i><i class="point"></i><i class="point"></i></div>
+                        <span class="inner"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2.5">
+                                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                            </svg> Run Prediction Engine</span>
+                    </button>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Results Dashboard (Hidden initially) -->
+        <div class="container results-dashboard" id="resultsDash" style="max-width: 95%; width: 100%;">
+
+            <div class="flex-header">
+                <h2 style="font-size:2rem; font-weight:800; letter-spacing:-0.03em;">Energy <span
+                        style="color:var(--accent);">Forecast</span></h2>
+            </div>
+
+            <div class="results-grid">
+                <div class="result-card primary">
+                    <span class="result-label">Energy Per Invocation</span>
+                    <div class="result-value" id="resWh">0.82 <span class="result-unit">Wh</span></div>
+                    <span class="result-sub" style="color:var(--green);">Confidence: ± 0.04 Wh (R² 0.94)</span>
+                </div>
+                <div class="result-card">
+                    <span class="result-label">Est. Cost (Monthly)</span>
+                    <div class="result-value" id="resCost">₹3,486<span style="font-size:1.5rem;">.00</span></div>
+                    <span class="result-sub">At current frequency</span>
+                </div>
+                <div class="result-card"
+                    style="display:flex; flex-direction:column; justify-content:center; align-items:center; padding:1.5rem; position:relative;">
+                    <span class="result-label"
+                        style="align-self:flex-start; margin-bottom:auto; position:relative;">Efficiency Score</span>
+                    <div class="gauge-wrapper" style="margin-top:2rem;">
+                        <svg viewBox="0 0 100 55" class="gauge-svg" width="200" height="110">
+                            <path d="M 5 50 A 45 45 0 0 1 95 50" fill="none" class="gauge-arch" stroke="#1a1a1a"
+                                stroke-width="10" stroke-linecap="round" />
+                            <path d="M 5 50 A 45 45 0 0 1 95 50" fill="none" class="gauge-fill" id="gaugeMeter"
+                                stroke="var(--amber)" stroke-width="10" stroke-linecap="round" stroke-dasharray="141.37"
+                                stroke-dashoffset="141.37" />
+                        </svg>
+                        <div class="gauge-score" id="gaugeVal">--</div>
+                    </div>
+                </div>
+                <!-- new KPI cards -->
+                <div class="result-card">
+                    <span class="result-label">Carbon Emission</span>
+                    <div class="result-value" id="resCarbon" style="color:var(--green)">0.00 <span
+                            class="result-unit">kg CO₂/mo</span></div>
+                    <span class="result-sub" id="resCarbonEq">≈ 0 km driven</span>
+                </div>
+                <div class="result-card">
+                    <span class="result-label">Est. Runtime Cost (AWS)</span>
+                    <div class="result-value" id="resRunCost">₹0.00 <span class="result-unit">/ mo</span></div>
+                    <span class="result-sub" title="Compute: ₹0.00 | Requests: ₹0.00" id="resRunCostSub">Compute +
+                        Requests</span>
+                </div>
+            </div>
+
+            <div class="results-grid" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 3rem;">
+                <!-- Feature Importance / Refactoring gaps -->
+                <div class="result-card" style="background:transparent; border:none; padding:0;">
+                    <h3 style="margin-bottom:1rem; font-size:1.1rem;">Optimization Potential</h3>
+
+                    <div
+                        style="background:#0d0d0d; border:1px solid var(--border-h); border-radius:8px; padding:1.5rem; margin-bottom:1rem;">
+                        <div
+                            style="display:flex; justify-content:space-between; margin-bottom:0.5rem; font-family:var(--mono);">
+                            <span style="color:var(--text-2);">Current Pred: <b style="color:var(--text);">0.82
+                                    Wh</b></span>
+                            <span style="color:var(--text-2);">If Optimized: <b style="color:var(--green);">0.34
+                                    Wh</b></span>
+                        </div>
+                        <div class="compare-bar">
+                            <div class="cb-fill cb-current"></div>
+                            <div class="cb-fill cb-optimized" id="cbOpt"></div>
+                        </div>
+                        <div
+                            style="text-align:right; margin-top:0.5rem; color:var(--green); font-weight:700; font-size:0.8rem;">
+                            Est. Savings: 58.5%</div>
+                    </div>
+
+                    <div style="display:flex; gap:1rem; margin-top:2rem; margin-bottom:1rem;">
+                        <button class="btn btn-primary" style="flex:1" onclick="alert('Results copied to clipboard.')">
+                            <span class="fold"></span>
+                            <span class="inner">Copy JSON</span>
+                        </button>
+                        <button class="btn btn-ghost" style="flex:1"
+                            onclick="alert('Generating Architectural PDF Report...')">
+                            <span class="inner">Download PDF</span>
+                        </button>
+                    </div>
+
+                    <h3 style="margin-top:2rem; margin-bottom:1rem; font-size:1.1rem;">Resource Breakdown</h3>
+                    <div
+                        style="background:rgba(20,20,20,0.6); border:1px solid rgba(255,255,255,0.05); border-radius:12px; padding:1.5rem; box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);">
+                        <div style="margin-bottom:1.5rem;">
+                            <div
+                                style="display:flex; justify-content:space-between; margin-bottom:0.4rem; font-size:0.75rem; font-family:var(--mono);">
+                                <span style="color:var(--text-2);">MEMORY FOOTPRINT</span>
+                                <span style="color:var(--text); font-weight:600;" id="rb-mem-val">0 MB</span>
+                            </div>
+                            <div
+                                style="width: 100%; height: 6px; background: rgba(255,255,255,0.05); border-radius: 4px; overflow: hidden;">
+                                <div id="rb-mem-bar"
+                                    style="height:100%; background:var(--accent); width:0%; transition: width 1.2s ease; border-radius:4px; box-shadow: 0 0 10px var(--accent);">
+                                </div>
+                            </div>
+                        </div>
+                        <div style="margin-bottom:1.5rem;">
+                            <div
+                                style="display:flex; justify-content:space-between; margin-bottom:0.4rem; font-size:0.75rem; font-family:var(--mono);">
+                                <span style="color:var(--text-2);">RUNTIME DURATION</span>
+                                <span style="color:var(--text); font-weight:600;" id="rb-time-val">0 ms</span>
+                            </div>
+                            <div
+                                style="width: 100%; height: 6px; background: rgba(255,255,255,0.05); border-radius: 4px; overflow: hidden;">
+                                <div id="rb-time-bar"
+                                    style="height:100%; background:#00e5ff; width:0%; transition: width 1.2s ease; border-radius:4px; box-shadow: 0 0 10px #00e5ff;">
+                                </div>
+                            </div>
+                        </div>
+                        <div style="margin-bottom:1.5rem;">
+                            <div
+                                style="display:flex; justify-content:space-between; margin-bottom:0.4rem; font-size:0.75rem; font-family:var(--mono);">
+                                <span style="color:var(--text-2);">ENERGY CONSUMPTION</span>
+                                <span style="color:var(--text); font-weight:600;" id="rb-energy-val">0.000 Wh</span>
+                            </div>
+                            <div
+                                style="width: 100%; height: 6px; background: rgba(255,255,255,0.05); border-radius: 4px; overflow: hidden;">
+                                <div id="rb-energy-bar"
+                                    style="height:100%; background:var(--accent); width:0%; transition: width 1.2s ease; border-radius:4px; box-shadow: 0 0 10px var(--accent);">
+                                </div>
+                            </div>
+                        </div>
+                        <div>
+                            <div
+                                style="display:flex; justify-content:space-between; margin-bottom:0.4rem; font-size:0.75rem; font-family:var(--mono);">
+                                <span style="color:var(--text-2);">COLD START OVERHEAD</span>
+                                <span style="color:var(--text); font-weight:600;" id="rb-cold-val">0 ms</span>
+                            </div>
+                            <div
+                                style="width: 100%; height: 6px; background: rgba(255,255,255,0.05); border-radius: 4px; overflow: hidden;">
+                                <div id="rb-cold-bar"
+                                    style="height:100%; background:#ffc233; width:0%; transition: width 1.2s ease; border-radius:4px; box-shadow: 0 0 10px #ffc233;">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Recommendations list -->
+                <div class="result-card" style="border:none; padding:0; background:none;">
+                    <h3 style="font-size:1.1rem;">Optimization Recommendations</h3>
+                    <div class="recommendations-list">
+                        <div class="rec-item critical">
+                            <div class="rec-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor" stroke-width="2">
+                                    <path
+                                        d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z">
+                                    </path>
+                                    <line x1="12" y1="9" x2="12" y2="13"></line>
+                                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                                </svg></div>
+                            <div class="rec-content">
+                                <h4>🔴 Critical</h4>
+                                <p>"Your nested loop at line 23 is the biggest energy drain. Flatten it."</p>
+                                <span class="rec-saving">Potential saving: ~18% Wh</span>
+                            </div>
+                        </div>
+                        <div class="rec-item warning">
+                            <div class="rec-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor" stroke-width="2">
+                                    <rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect>
+                                    <rect x="9" y="9" width="6" height="6"></rect>
+                                    <line x1="9" y1="1" x2="9" y2="4"></line>
+                                    <line x1="15" y1="1" x2="15" y2="4"></line>
+                                    <line x1="9" y1="20" x2="9" y2="23"></line>
+                                    <line x1="15" y1="20" x2="15" y2="23"></line>
+                                </svg></div>
+                            <div class="rec-content">
+                                <h4>🟡 Warning</h4>
+                                <p>"You're making 4 separate DB calls. Batch them into one."</p>
+                                <span class="rec-saving">Potential saving: ~12% Wh</span>
+                            </div>
+                        </div>
+                        <div class="rec-item good">
+                            <div class="rec-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor" stroke-width="2">
+                                    <polyline points="20 6 9 17 4 12"></polyline>
+                                </svg></div>
+                            <div class="rec-content">
+                                <h4>🟢 Good</h4>
+                                <p>"Memory allocation is well configured for this workload."</p>
+                                <span class="rec-saving" style="color:var(--green);">Status: Optimal ✓</span>
+                            </div>
+                        </div>
+
+                        <!-- AWS Specific Insights -->
+                        <h3 style="margin-top:2rem; margin-bottom:1rem; font-size:1.1rem;">AWS-Specific Insights</h3>
+                        <div class="rec-item" style="border-left-color:#00e5ff;">
+                            <div class="rec-icon" style="color:#00e5ff; background:rgba(0,229,255,0.1);"><svg width="14"
+                                    height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="3"></circle>
+                                    <path
+                                        d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z">
+                                    </path>
+                                </svg></div>
+                            <div class="rec-content">
+                                <h4>⚙️ Memory Right-Sizing</h4>
+                                <p id="aws-mem-tun">Evaluating memory footprint...</p>
+                                <span class="rec-saving" id="aws-mem-saving"></span>
+                            </div>
+                        </div>
+                        <div class="rec-item" style="border-left-color:var(--accent);">
+                            <div class="rec-icon" style="color:var(--accent); background:rgba(200,255,0,0.1);"><svg
+                                    width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                                </svg></div>
+                            <div class="rec-content">
+                                <h4>⚡ Invocation Pattern</h4>
+                                <p id="aws-inv-pat">Analyzing concurrency setup...</p>
+                            </div>
+                        </div>
+                        <div class="rec-item" style="border-left-color:#ffc233;">
+                            <div class="rec-icon" style="color:#ffc233; background:rgba(255,194,51,0.1);"><svg
+                                    width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <circle cx="12" cy="12" r="10"></circle>
+                                    <polyline points="12 6 12 12 16 14"></polyline>
+                                </svg></div>
+                            <div class="rec-content">
+                                <h4>⏱️ Timeout Configuration</h4>
+                                <p id="aws-time-conf">Checking timeout safety buffer...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="footer-inner">
+            <div class="footer-left">
+                <span class="footer-brand">⚡ Green Lambda</span>
+                <span class="footer-copy">© 2026 Green Lambda. All rights reserved.</span>
+            </div>
+            <div class="footer-right">
+                <span>ML-Driven Energy Prediction for Serverless Workloads</span>
+                <span class="footer-sep">|</span>
+                <span>Mini Project — SEM 4</span>
+            </div>
+        </div>
+    </footer>
+
+    <script src="script.js?v=6"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            window.scrollTo(0, 0);
+
+            // Re-trigger scroll reveal for elements in new page
+            gsap.fromTo('.reveal',
+                { y: 40, opacity: 0 },
+                { y: 0, opacity: 1, duration: 0.8, ease: 'power3.out', stagger: 0.2, delay: 0.2 }
+            );
+
+            // Handle loader
+            const loader = document.getElementById('loader');
+            if (loader) {
+                setTimeout(() => {
+                    loader.style.transition = 'opacity 0.8s ease-out';
+                    loader.style.opacity = '0';
+                    setTimeout(() => {
+                        loader.style.display = 'none';
+                        const cursorWrapper = document.querySelector('.target-cursor-wrapper');
+                        if (cursorWrapper) {
+                            cursorWrapper.classList.add('visible');
+                        }
+                    }, 800);
+                }, 400); // Hide loader quickly after DOM is ready
+            } else {
+                const cursorWrapper = document.querySelector('.target-cursor-wrapper');
+                if (cursorWrapper) {
+                    cursorWrapper.classList.add('visible');
+                }
+            }
+        });
+
+        // Fallback: forcefully hide loader after 2s just in case
+        setTimeout(() => {
+            const loader = document.getElementById('loader');
+            if (loader && loader.style.display !== 'none') {
+                loader.style.display = 'none';
+            }
+        }, 2000);
+    </script>
+</body>
+
+</html>
