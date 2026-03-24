@@ -1,0 +1,31 @@
+name: Green Lambda Energy Assessment
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  energy_scan:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Install Analysis Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install requests radon
+        
+    - name: Run Green Lambda ML Assessment (Demo Mode)
+      env:
+        GREEN_LAMBDA_URL: "http://localhost:5000"
+        API_KEY: "TEST-KEY-123"
+        ENERGY_THRESHOLD_WH: "3.50"
+      run: |
+        python green_lambda_ci.py

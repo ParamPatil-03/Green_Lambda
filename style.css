@@ -3363,7 +3363,7 @@ input:checked+.slider:before {
 
 .results-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
     gap: 1.5rem;
     margin-bottom: 1.5rem;
 }
@@ -3392,17 +3392,19 @@ input:checked+.slider:before {
 }
 
 .result-value {
-    font-size: 2.5rem;
+    font-size: 2.1rem;
     font-weight: 800;
     color: var(--text);
     font-family: var(--mono);
-    line-height: 1;
+    line-height: 1.2;
     margin-bottom: 0.5rem;
+    word-break: break-word;
+    overflow-wrap: anywhere;
 }
 
 .result-card.primary .result-value {
     color: var(--accent);
-    font-size: 3.5rem;
+    font-size: 2.8rem;
 }
 
 .result-unit {

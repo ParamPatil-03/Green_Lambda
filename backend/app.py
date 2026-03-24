@@ -167,17 +167,114 @@ def analyze_function():
     try:
         X_single, row_details = prepare_features(fn_name)
         
+        # ── AWS CLOUDWATCH LIVE EXTRACTION (Dynamic ML Features) ──
+        # In a full-auth environment, we extract keys via connectionId from DB.
+        # For the presentation, we attempt to pull AWS metrics, but gracefully fallback 
+        # to our historically accurate Dataset Averages (Demo Mode).
+        access_key = data.get('accessKeyId')
+        secret_key = data.get('secretAccessKey')
+        region = data.get('region', 'ap-south-1')
+        
+        live_duration_ms = None
+        if access_key and access_key != "TEST-KEY-123":
+            try:
+                import boto3
+                from datetime import datetime, timedelta
+                cw = boto3.client('cloudwatch', 
+                                  aws_access_key_id=access_key, 
+                                  aws_secret_access_key=secret_key, 
+                                  region_name=region)
+                
+                # Query past 14 days of live Duration execution history
+                end_time = datetime.utcnow()
+                start_time = end_time - timedelta(days=14)
+                cw_res = cw.get_metric_statistics(
+                    Namespace='AWS/Lambda',
+                    MetricName='Duration',
+                    Dimensions=[{'Name': 'FunctionName', 'Value': fn_name}],
+                    StartTime=start_time,
+                    EndTime=end_time,
+                    Period=86400, # Daily aggregations
+                    Statistics=['Average']
+                )
+                
+                if cw_res['Datapoints']:
+                    live_duration_ms = sum(dp['Average'] for dp in cw_res['Datapoints']) / len(cw_res['Datapoints'])
+                    print(f"Live CloudWatch Duration for {fn_name}: {live_duration_ms} ms")
+                    
+                # ── AST STATIC CODE PROFILING (Live Complexity Extract) ──
+                import requests
+                import tempfile
+                import zipfile
+                from radon.complexity import cc_visit
+                import ast
+                
+                lb = boto3.client('lambda', 
+                                  aws_access_key_id=access_key, 
+                                  aws_secret_access_key=secret_key, 
+                                  region_name=region)
+                
+                fn_info = lb.get_function(FunctionName=fn_name)
+                code_url = fn_info['Code']['Location']
+                
+                # Download and Unzip the Raw Lambda Codebundle
+                r = requests.get(code_url, timeout=10)
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    zip_path = os.path.join(tmpdir, 'lambda_code.zip')
+                    with open(zip_path, 'wb') as f:
+                        f.write(r.content)
+                    
+                    with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                        zip_ref.extractall(tmpdir)
+                    
+                    # Run secure AST Scanner using Radon across all *.py files
+                    total_loc = 0
+                    complexities = []
+                    
+                    for root, dirs, files in os.walk(tmpdir):
+                        for file in files:
+                            if file.endswith('.py'):
+                                py_path = os.path.join(root, file)
+                                with open(py_path, 'r', encoding='utf-8') as pyf:
+                                    content = pyf.read()
+                                    lines = content.splitlines()
+                                    total_loc += len([line for line in lines if line.strip() and not line.strip().startswith('#')])
+                                    
+                                    try:
+                                        blocks = cc_visit(content)
+                                        if blocks:
+                                            complexities.extend([b.complexity for b in blocks])
+                                    except:
+                                        pass
+                                        
+                    if total_loc > 0:
+                        live_loc = total_loc
+                        live_cc = (sum(complexities) / len(complexities)) if complexities else 1.0
+                        print(f"✅ Live AST Scan Complete: {live_loc} LOC, {live_cc} Avg Complexity")
+                        
+                        # Override static dataset features with REAL Live AST metrics
+                        X_single['lines_of_code'] = live_loc
+                        X_single['cyclomatic_complexity'] = live_cc
+                        
+            except Exception as live_err:
+                print(f"Live AWS integration skipped/failed, using dataset fallback: {live_err}")
+
+        # Override the static CSS dataset with Live Infrastructure Data if fetched
+        if live_duration_ms:
+            X_single['aws_duration_ms'] = live_duration_ms
+            row_details['aws_duration_ms'] = live_duration_ms
+
         if model_name == 'neural_network' and scaler:
             X_pred = scaler.transform(X_single)
         else:
             X_pred = X_single
             
-        # Predict Energy
+        # Predict Energy dynamically using live/fallback cloudwatch metrics
         energy_pred = float(model.predict(X_pred)[0])
         
         # Calculate derived metrics
         mem_mb = float(row_details['memory_config_mb'].values[0])
-        dur_ms = float(row_details['aws_duration_ms'].values[0])
+        dur_ms = float(row_details['aws_duration_ms'].values[0])  # Uses live if available
         
         # Confidence logic based on model
         conf = 0.96 if model_name == 'xgboost' else 0.94 if model_name == 'random_forest' else 0.92
