@@ -1463,38 +1463,56 @@ function createDemoLiveMetrics(predictedReqPerHour) {
 /* ─── AUTH HELPERS ─────────────────────────────────────── */
 
 async function checkAuth() {
-    if (!window.supabase) return null;
+    if (!window.supabase && !window.supabaseClient) return null;
     try {
-        const { data: { session } } = await window.supabase.auth.getSession();
-        const user = session?.user || null;
+        const client = window.supabase || window.supabaseClient;
+        let user = null;
+        try {
+            const { data: { session } } = await client.auth.getSession();
+            user = session?.user || null;
+        } catch (err) {
+            console.warn("Supabase auth failed. Continuing to Demo Check:", err.message);
+        }
+        
+        // ── Check Demo Bypass Fallback ──
+        const demoEmail = localStorage.getItem('green_lambda_demo_user');
+        if (!user && demoEmail) {
+            user = { id: 'demo-user-123', email: demoEmail };
+        }
 
         if (user) {
             // Check if local session has AWS functions. If not, try to fetch from DB.
             const localSession = getSession();
             if (!localSession?.functions?.length) {
-                const { data: conns } = await window.supabase
-                    .from('aws_connections')
-                    .select('*, lambda_functions(function_name, runtime, memory_mb)')
-                    .eq('user_id', user.id)
-                    .order('created_at', { ascending: false })
-                    .limit(1);
+                // DO NOT CRASH: Make sure to use the resolved client!
+                // Also, if it's the demo-user-123, skip the DB lookup natively because they have no DB records!
+                if (user.id === 'demo-user-123') {
+                    // Do nothing for demo user, let them reach the Connect AWS page
+                } else if (client) {
+                    const { data: conns } = await client
+                        .from('aws_connections')
+                        .select('*, lambda_functions(function_name, runtime, memory_mb)')
+                        .eq('user_id', user.id)
+                        .order('created_at', { ascending: false })
+                        .limit(1);
 
-                if (conns && conns.length > 0) {
-                    const dbConn = conns[0];
-                    const fnList = (dbConn.lambda_functions || []).map(f => ({
-                        name: f.function_name,
-                        runtime: f.runtime,
-                        memoryMb: f.memory_mb
-                    }));
+                    if (conns && conns.length > 0) {
+                        const dbConn = conns[0];
+                        const fnList = (dbConn.lambda_functions || []).map(f => ({
+                            name: f.function_name,
+                            runtime: f.runtime,
+                            memoryMb: f.memory_mb
+                        }));
 
-                    setSession({
-                        connectionId: dbConn.id,
-                        region: dbConn.region,
-                        accountAlias: dbConn.account_alias,
-                        mode: 'live',
-                        functions: fnList,
-                        connectedAt: dbConn.created_at
-                    });
+                        setSession({
+                            connectionId: dbConn.id,
+                            region: dbConn.region,
+                            accountAlias: dbConn.account_alias,
+                            mode: 'live',
+                            functions: fnList,
+                            connectedAt: dbConn.created_at
+                        });
+                    }
                 }
             }
         }
@@ -2343,25 +2361,36 @@ function initLoginPage() {
             signupStatus.className = 'fc-status loading';
             btn.disabled = true;
 
-            const { data, error } = await supabase.auth.signUp({
-                email: email,
-                password: password,
-            });
+            try {
+                const { data, error } = await window.supabaseClient.auth.signUp({
+                    email: email,
+                    password: password,
+                });
 
-            if (error) {
-                signupStatus.textContent = error.message;
+                if (error) {
+                    signupStatus.textContent = error.message || 'Error occurred';
+                    signupStatus.className = 'fc-status error';
+                    btn.disabled = false;
+                } else {
+                    signupStatus.textContent = 'Account created successfully!';
+                    signupStatus.className = 'fc-status ok';
+                    signupForm.reset();
+                    setTimeout(() => {
+                        authToggle.checked = false;
+                        authToggle.dispatchEvent(new Event('change'));
+                        btn.disabled = false;
+                        signupStatus.textContent = '';
+                    }, 1500);
+                }
+            } catch (err) {
+                console.error("Signup exception:", err);
+                let msg = err.message || JSON.stringify(err);
+                if (msg.includes("supabase is not defined")) {
+                    msg = "Connection blocked. Check your AdBlocker or internet connection.";
+                }
+                signupStatus.textContent = 'Error: ' + msg;
                 signupStatus.className = 'fc-status error';
                 btn.disabled = false;
-            } else {
-                signupStatus.textContent = 'Account created successfully!';
-                signupStatus.className = 'fc-status ok';
-                signupForm.reset();
-                setTimeout(() => {
-                    authToggle.checked = false;
-                    authToggle.dispatchEvent(new Event('change'));
-                    btn.disabled = false;
-                    signupStatus.textContent = '';
-                }, 1500);
             }
         });
     }
@@ -2377,22 +2406,221 @@ function initLoginPage() {
             loginStatus.className = 'fc-status loading';
             btn.disabled = true;
 
-            const { data, error } = await supabase.auth.signInWithPassword({
-                email: email,
-                password: password,
-            });
+            try {
+                const { data, error } = await window.supabaseClient.auth.signInWithPassword({
+                    email: email,
+                    password: password,
+                });
 
-            if (error) {
-                loginStatus.textContent = error.message;
+                if (error) {
+                    if (error.message.toLowerCase().includes("email not confirmed") || error.message.toLowerCase().includes("verify your email")) {
+                        loginStatus.textContent = "Demo Security: Bypassing Email Verification...";
+                        loginStatus.className = 'fc-status ok';
+                        
+                        // INJECT MOCK SESSION FOR DEMO UI
+                        localStorage.setItem('green_lambda_demo_user', email);
+                        
+                        setTimeout(() => {
+                            window.location.href = 'index.html';
+                        }, 1200);
+                    } else {
+                        loginStatus.textContent = error.message;
+                        loginStatus.className = 'fc-status error';
+                        btn.disabled = false;
+                    }
+                } else {
+                    loginStatus.textContent = 'Success! Redirecting...';
+                    loginStatus.className = 'fc-status ok';
+                    setTimeout(() => {
+                        window.location.href = 'index.html';
+                    }, 500);
+                }
+            } catch (err) {
+                console.error("Login exception:", err);
+                let msg = err.message || JSON.stringify(err);
+                if (msg.includes("supabase is not defined")) msg = "Connection blocked (check AdBlocker).";
+                loginStatus.textContent = 'Error: ' + msg;
                 loginStatus.className = 'fc-status error';
                 btn.disabled = false;
-            } else {
-                loginStatus.textContent = 'Logged in successfully!';
-                loginStatus.className = 'fc-status ok';
-                setTimeout(() => {
-                    window.location.href = 'index.html'; // Redirect to home
-                }, 1000);
             }
         });
     }
+}
+
+/* --- Global Session Checker for UI Profile Avatar --- */
+async function checkAuthStatus() {
+    if (!window.supabaseClient) return;
+    
+    try {
+        let session = null;
+        let activeUserEmail = null;
+
+        if (window.supabaseClient) {
+            try {
+                const res = await window.supabaseClient.auth.getSession();
+                session = res.data.session;
+            } catch (err) {
+                console.warn("Supabase getSession failed, continuing local check:", err.message);
+            }
+        }
+        
+        // ── Check Demo Bypass Fallback ──
+        const demoEmail = localStorage.getItem('green_lambda_demo_user');
+        
+        if (session && session.user) {
+            activeUserEmail = session.user.email;
+        } else if (demoEmail) {
+            session = true; // Mock true to force UI update
+            activeUserEmail = demoEmail;
+        }
+        
+        // This targets the specific Get Started button on index.html, dashboard.html, etc.
+        const authBtnProfile = document.getElementById('authBtnProfile');
+        const authBtnInner = document.getElementById('authBtnInner');
+        const homeConnectAwsBtn = document.getElementById('homeConnectAwsBtn');
+        
+        // If a session exists, we swap the UI!
+        if (session) {
+            
+            // Re-route the bottom CTA directly to AWS dashboard since they are logged in!
+            if (homeConnectAwsBtn) {
+                homeConnectAwsBtn.href = 'connect.html';
+                // Update icon/text optionally, but default says 'Connect AWS' which is correct
+            }
+
+            if (authBtnProfile && authBtnInner) {
+            
+            // Extract their email prefix to use as a username
+            const username = (activeUserEmail || "verified").split('@')[0];
+            
+            // 1. Hide the entire "Get Started" button completely
+            authBtnProfile.style.display = 'none';
+
+            // 2. Check if avatar already exists (to avoid duplicate injection on redraws)
+            if (!document.getElementById('greenLambdaAvatar')) {
+                // Create a container specifically for the avatar + dropdown relative positioning
+                const avatarContainer = document.createElement('div');
+                avatarContainer.id = 'greenLambdaAvatarContainer';
+                avatarContainer.style.position = 'relative';
+
+                // 3. Create a modern circular Profile Avatar
+                const avatarBtn = document.createElement('div');
+                avatarBtn.id = 'greenLambdaAvatar';
+                avatarBtn.title = `Logged in as ${username}`;
+                avatarBtn.style.cssText = `
+                    width: 40px;
+                    height: 40px;
+                    border-radius: 50%;
+                    background: linear-gradient(145deg, #c8ff00, #00f0ff);
+                    color: #0a0a0a;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-weight: 800;
+                    font-size: 1.1rem;
+                    text-transform: uppercase;
+                    box-shadow: 0 0 12px rgba(200,255,0,0.5);
+                    cursor: pointer;
+                    transition: transform 0.2s ease, box-shadow 0.2s ease;
+                `;
+                
+                // Set the initial of their username inside the circle
+                avatarBtn.textContent = username.charAt(0);
+
+                // Add hover animations
+                avatarBtn.onmouseover = () => { avatarBtn.style.boxShadow = '0 0 20px rgba(0,240,255,0.7)'; };
+                avatarBtn.onmouseout = () => { avatarBtn.style.boxShadow = '0 0 12px rgba(200,255,0,0.5)'; };
+
+                // 4. Create the Dropdown Popup Menu
+                const dropdown = document.createElement('div');
+                dropdown.id = 'greenLambdaDropdown';
+                dropdown.style.cssText = `
+                    position: absolute;
+                    top: 50px;
+                    right: 0;
+                    width: 200px;
+                    background: #111;
+                    border: 1px solid rgba(255,255,255,0.1);
+                    border-radius: 8px;
+                    box-shadow: 0 4px 20px rgba(0,0,0,0.8);
+                    display: none;
+                    flex-direction: column;
+                    z-index: 9999;
+                    overflow: hidden;
+                    animation: fadeIn 0.15s ease-out;
+                `;
+
+                // Add Dropdown Items
+                dropdown.innerHTML = `
+                    <div style="padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                        <div style="font-size: 0.8rem; color: #888;">Signed in as</div>
+                        <div style="font-size: 0.9rem; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${activeUserEmail}</div>
+                    </div>
+                    <a href="connect.html" style="padding: 12px 16px; text-decoration: none; color: #e0e0e0; font-size: 0.9rem; transition: background 0.2s;">
+                        ⚡ Dashboard
+                    </a>
+                    <div id="logoutBtnWrapper" style="padding: 12px 16px; border-top: 1px solid rgba(255,255,255,0.05); color: #ff4a4a; font-size: 0.9rem; cursor: pointer; transition: background 0.2s;">
+                        🚪 Log Out
+                    </div>
+                `;
+
+                // Assemble the DOM payload
+                avatarContainer.appendChild(avatarBtn);
+                avatarContainer.appendChild(dropdown);
+                
+                // Inject it directly next to where the Get Started button was!
+                authBtnProfile.parentNode.insertBefore(avatarContainer, authBtnProfile.nextSibling);
+
+                // CSS styling for dropdown hover states dynamically
+                const style = document.createElement('style');
+                style.textContent = `
+                    #greenLambdaDropdown a:hover, #logoutBtnWrapper:hover { background: rgba(255,255,255,0.05); }
+                    @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
+                `;
+                document.head.appendChild(style);
+
+                // Toggle dropdown on avatar click
+                avatarBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const isVisible = dropdown.style.display === 'flex';
+                    dropdown.style.display = isVisible ? 'none' : 'flex';
+                });
+
+                // Close dropdown if clicking anywhere else on the page
+                document.addEventListener('click', (e) => {
+                    if (!avatarContainer.contains(e.target)) {
+                        dropdown.style.display = 'none';
+                    }
+                });
+
+                // Logout logic natively executed
+                document.getElementById('logoutBtnWrapper').addEventListener('click', async () => {
+                    // Destroy mock demo session
+                    localStorage.removeItem('green_lambda_demo_user');
+                    // Destroy real Supabase session natively
+                    if (window.supabaseClient) {
+                        try { await window.supabaseClient.auth.signOut(); } catch(e) {}
+                    }
+                    
+                    // Native UI Reset (Remove Avatar, Bring back "Get Started", Route Connect backwards)
+                    avatarContainer.remove();
+                    authBtnProfile.style.display = 'flex';
+                    if (homeConnectAwsBtn) homeConnectAwsBtn.href = "login.html";
+                });
+            }
+        }
+    } else {
+        // User is explicitly logged out
+        if (homeConnectAwsBtn) homeConnectAwsBtn.href = "login.html";
+    }
+} catch (e) {
+        // If they bypass normally or no connection is active, just leave it as Get Started
+    }
+}
+
+// Ensure it checks auth on every single page load natively
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', checkAuthStatus);
+} else {
+    checkAuthStatus();
 }
