@@ -1,0 +1,23 @@
+# Node Modules
+node_modules/
+package-lock.json
+
+# Python Virtual Environments
+venv/
+env/
+ml_model/venv/
+backend/venv/
+.env
+
+# Cache & Compiled Files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Jupyter Notebook configs
+.ipynb_checkpoints/

@@ -1,7 +1,4 @@
 {
-  "devDependencies": {
-    "monaco-editor": "^0.55.1"
-  },
   "name": "mini-project",
   "version": "1.0.0",
   "description": "",

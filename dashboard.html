@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Monitoring | Green Lambda</title>
+    <meta name="description" content="Track predicted vs actual AWS Lambda energy metrics in real time.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@300;400;500;600&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body data-page="dashboard">
+    <nav class="nav" id="nav">
+        <div class="nav-inner">
+            <a href="index.html" class="nav-logo">
+                <span class="logo-mark">⚡</span>
+                <span class="logo-text">Green Lambda</span>
+            </a>
+            <div class="nav-links" id="navLinks">
+                <a href="index.html" class="nav-link" data-section="home">
+                    <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                        xmlns="http://www.w3.org/2000/svg" stroke-width="2.5" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                    </svg> Home
+                </a>
+                <a href="connect.html" class="nav-link" data-section="connect">
+                    <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                        xmlns="http://www.w3.org/2000/svg" stroke-width="2.5" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <polyline points="16 18 22 12 16 6"></polyline>
+                        <polyline points="8 6 2 12 8 18"></polyline>
+                    </svg> Connect AWS
+                </a>
+                <a href="analyze.html" class="nav-link" data-section="analyze">
+                    <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                        xmlns="http://www.w3.org/2000/svg" stroke-width="2.5" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg> Analyze
+                </a>
+                <a href="dashboard.html" class="nav-link active" data-section="dashboard">
+                    <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                        xmlns="http://www.w3.org/2000/svg" stroke-width="2.5" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
+                    </svg> Live Dashboard
+                </a>
+            </div>
+            <button class="nav-toggle" id="navToggle" aria-label="Toggle menu">
+                <span></span><span></span><span></span>
+            </button>
+        </div>
+    </nav>
+
+    <div class="scroll-progress" id="scrollProgress"></div>
+
+    <main class="workflow-main section">
+        <div class="container">
+            <div class="workflow-shell reveal">
+                <span class="section-label">Step 4 — Live Monitoring</span>
+                <h1 class="section-title">Predicted vs <em>Actual</em> Monitoring</h1>
+                <p class="section-subtitle">Green Lambda pulls CloudWatch metrics and compares them with your spike forecast in near real-time.</p>
+
+                <div id="liveConnectionHint" class="status-banner"></div>
+
+                <div class="workflow-form">
+                    <div class="form-grid-3">
+                        <div class="form-group">
+                            <label class="form-label" for="liveFunctionSelect">Function</label>
+                            <select class="form-control" id="liveFunctionSelect">
+                                <option value="">Select a function...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="liveRefreshInterval">Refresh Every</label>
+                            <select class="form-control" id="liveRefreshInterval">
+                                <option value="30">30 seconds</option>
+                                <option value="60" selected>60 seconds</option>
+                                <option value="300">5 minutes</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="liveAutoToggle">Auto Refresh</label>
+                            <select class="form-control" id="liveAutoToggle">
+                                <option value="on" selected>Enabled</option>
+                                <option value="off">Paused</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="workflow-actions" style="margin-top:0.5rem;">
+                        <button type="button" class="btn btn-primary" id="liveRefreshNowBtn">
+                            <span class="fold"></span>
+                            <div class="points_wrapper"><i class="point"></i><i class="point"></i><i class="point"></i><i
+                                    class="point"></i><i class="point"></i><i class="point"></i><i class="point"></i><i
+                                    class="point"></i><i class="point"></i><i class="point"></i></div>
+                            <span class="inner">
+                                <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                                    xmlns="http://www.w3.org/2000/svg" stroke-linecap="round" stroke-linejoin="round"
+                                    stroke-width="2.5">
+                                    <polyline points="23 4 23 10 17 10"></polyline>
+                                    <polyline points="1 20 1 14 7 14"></polyline>
+                                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                                </svg> Refresh Live Metrics
+                            </span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="results-grid" style="margin-top:1.5rem;">
+                    <div class="result-card">
+                        <span class="result-label">Predicted Req/Hour</span>
+                        <div class="result-value" id="liveKpiPredicted">--</div>
+                    </div>
+                    <div class="result-card">
+                        <span class="result-label">Actual Req/Hour</span>
+                        <div class="result-value" id="liveKpiActual">--</div>
+                    </div>
+                    <div class="result-card">
+                        <span class="result-label">Deviation</span>
+                        <div class="result-value" id="liveKpiDeviation">--</div>
+                    </div>
+                    <div class="result-card">
+                        <span class="result-label">System Status</span>
+                        <div class="result-value" id="liveKpiStatus">--</div>
+                        <span class="result-sub" id="liveLastUpdated">Last updated: --</span>
+                    </div>
+                </div>
+
+                <div id="liveAlertBox" class="status-banner" style="margin-top:1rem;"></div>
+
+                <div class="dashboard-grid" style="margin-top:1.5rem;">
+                    <div class="dash-card">
+                        <div class="dash-card-header">
+                            <h3>Predicted vs Actual Trend</h3>
+                        </div>
+                        <div class="chart-wrap"><canvas id="liveCompareChart"></canvas></div>
+                    </div>
+                    <div class="dash-card">
+                        <div class="dash-card-header">
+                            <h3>Invocation Volume (Recent Samples)</h3>
+                        </div>
+                        <div class="chart-wrap"><canvas id="liveInvocationChart"></canvas></div>
+                    </div>
+                </div>
+
+                <div class="dash-card" style="margin-top:1.5rem;" id="optimizationAlertPanel">
+                    <div class="dash-card-header">
+                        <h3>⚙️ Optimization Alerts</h3>
+                        <span class="live-dot"></span>
+                    </div>
+                    <div id="optimizationAlertBody" style="padding: 1rem 0.5rem; display: flex; flex-direction: column; gap: 0.75rem;">
+                        <div class="opt-alert opt-neutral" id="optNoData">
+                            <span>📊 No anomalies detected yet. Select a function and refresh to start monitoring.</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="dash-card" style="margin-top:1.5rem;">
+                    <div class="dash-card-header">
+                        <h3>Live Sample Feed</h3>
+                    </div>
+                    <div style="overflow:auto;">
+                        <table class="fn-table">
+                            <thead>
+                                <tr>
+                                    <th>Timestamp</th>
+                                    <th>Predicted Req/Hr</th>
+                                    <th>Actual Req/Hr</th>
+                                    <th>Deviation</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="liveSampleBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="footer-inner">
+            <div class="footer-left">
+                <span class="footer-brand">⚡ Green Lambda</span>
+                <span class="footer-copy">© 2026 Green Lambda. All rights reserved.</span>
+            </div>
+            <div class="footer-right">
+                <span>CloudWatch Live Tracking</span>
+                <span class="footer-sep">|</span>
+                <span>Mini Project — SEM 4</span>
+            </div>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/simplex-noise/2.4.0/simplex-noise.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+    <!-- Supabase Logic -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabaseClient.js"></script>
+    <script src="script.js"></script>
+</body>
+
+</html>

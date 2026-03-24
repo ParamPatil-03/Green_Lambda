@@ -678,19 +678,44 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 /* --- original script.js --- */
-const initApp = () => {
-    console.log("Green Lambda App Initializing...");
+const initApp = async () => {
+    const page = document.body?.dataset?.page || 'home';
+    console.log(`Green Lambda App Initializing (${page})...`);
+
+    // ── Hydrate local cache from Supabase ──
+    if (page !== 'login') {
+        await checkAuth();
+    }
+
     initScrollReveal();
     initNavigation();
     initScrollProgress();
-    initHeroCanvas();
-    initKPICounters();
-    initLiveMetrics();
-    initCharts();
-    populateTable();
-    initSearch();
-    initChipButtons();
-    initDiscoverModal();
+
+    if (page === 'home') {
+        initHeroCanvas();
+        initKPICounters();
+        initLiveMetrics();
+        initCharts();
+        populateTable();
+        initSearch();
+        initChipButtons();
+        initDiscoverModal();
+    }
+
+    if (page === 'connect') {
+        initConnectPage();
+    }
+
+    if (page === 'analyze') {
+        initAnalyzePage();
+    }
+
+    if (page === 'dashboard') {
+        initDashboardPage();
+    }
+    if (page === 'login') {
+        initLoginPage();
+    }
 };
 
 if (document.readyState === 'loading') {
@@ -727,6 +752,9 @@ function initNavigation() {
     window.addEventListener('scroll', () => {
         nav.classList.toggle('scrolled', window.scrollY > 50);
 
+        const page = document.body?.dataset?.page || 'home';
+        if (page !== 'home') return; // Don't do scrollSpy on subpages, keeps active state intact
+
         let current = '';
         sections.forEach(s => {
             const top = s.offsetTop - 100;
@@ -734,6 +762,7 @@ function initNavigation() {
         });
 
         links.forEach(l => {
+            if (!l.dataset.section) return;
             l.classList.toggle('active', l.dataset.section === current);
         });
     });
@@ -743,12 +772,12 @@ function initNavigation() {
             const sectionId = link.dataset.section;
             if (!sectionId) return; // Allow normal navigation if no data-section exists
 
-            e.preventDefault();
             const target = document.getElementById(sectionId);
             if (target) {
+                e.preventDefault();
                 target.scrollIntoView({ behavior: 'smooth' });
+                if (navLinksWrap) navLinksWrap.classList.remove('open');
             }
-            if (navLinksWrap) navLinksWrap.classList.remove('open');
         });
     });
 
@@ -840,10 +869,10 @@ function initHeroCanvas() {
 
 function initKPICounters() {
     const targets = [
-        { id: 'kpiEnergy', end: 3.47, dec: 2 },
-        { id: 'kpiCost', end: 71000, dec: 0 },
-        { id: 'kpiCarbon', end: 12.8, dec: 1 },
-        { id: 'kpiAccuracy', end: 0.943, dec: 3 }
+        { id: 'kpiEnergy', end: 0.85, dec: 2 },
+        { id: 'kpiCost', end: 320, dec: 0 },
+        { id: 'kpiCarbon', end: 0.6, dec: 1 },
+        { id: 'kpiAccuracy', end: 0.999, dec: 3 }
     ];
 
     const observer = new IntersectionObserver(entries => {
@@ -922,7 +951,7 @@ function initCharts() {
                 datasets: [
                     {
                         label: 'Predicted',
-                        data: [3.2, 3.8, 4.1, 3.5, 4.6, 2.9, 3.4],
+                        data: [0.32, 0.38, 0.41, 0.35, 0.46, 0.29, 0.34],
                         borderColor: '#c8ff00',
                         backgroundColor: 'rgba(200,255,0,0.04)',
                         borderWidth: 2, fill: true, tension: 0.4,
@@ -930,7 +959,7 @@ function initCharts() {
                     },
                     {
                         label: 'Actual',
-                        data: [3.1, 3.9, 3.8, 3.7, 4.3, 3.1, 3.5],
+                        data: [0.31, 0.39, 0.38, 0.37, 0.43, 0.31, 0.35],
                         borderColor: '#7b61ff',
                         backgroundColor: 'rgba(123,97,255,0.03)',
                         borderWidth: 2, fill: true, tension: 0.4,
@@ -938,7 +967,7 @@ function initCharts() {
                     },
                     {
                         label: 'Optimized',
-                        data: [2.4, 2.8, 3.0, 2.6, 3.4, 2.1, 2.5],
+                        data: [0.24, 0.28, 0.30, 0.26, 0.34, 0.21, 0.25],
                         borderColor: '#36f9ae',
                         backgroundColor: 'rgba(54,249,174,0.02)',
                         borderWidth: 2, borderDash: [5, 5], fill: true, tension: 0.4,
@@ -968,9 +997,9 @@ function initCharts() {
         new Chart(distCtx, {
             type: 'doughnut',
             data: {
-                labels: ['API Gateway', 'DynamoDB Ops', 'S3 Transfers', 'Compute', 'Cold Starts', 'Auth/JWT'],
+                labels: ['Memory Allocation', 'Compute Cycles', 'Network I/O', 'Cold Starts', 'Garbage Collection', 'Init Overhead'],
                 datasets: [{
-                    data: [28, 32, 15, 12, 8, 5],
+                    data: [35, 28, 18, 10, 6, 3],
                     backgroundColor: [
                         'rgba(200,255,0,0.65)', 'rgba(123,97,255,0.65)', 'rgba(54,249,174,0.65)',
                         'rgba(255,194,51,0.65)', 'rgba(255,61,113,0.65)', 'rgba(255,138,71,0.65)'
@@ -993,10 +1022,10 @@ function initCharts() {
         new Chart(featureCtx, {
             type: 'bar',
             data: {
-                labels: ['Memory Alloc', 'I/O Calls', 'Cyclomatic Cx', 'Runtime (ms)', 'Cold Start', 'Loop Depth', 'Ext. APIs', 'Code Lines'],
+                labels: ['Memory Func Type', 'Local Memory (MB)', 'Lines of Code', 'AWS Mem Used', 'Nesting Depth', 'Conditionals', 'Function Calls', 'Loop Count'],
                 datasets: [{
                     label: 'SHAP Impact',
-                    data: [0.34, 0.28, 0.22, 0.19, 0.16, 0.11, 0.09, 0.05],
+                    data: [0.687, 0.108, 0.033, 0.025, 0.015, 0.012, 0.007, 0.002],
                     backgroundColor: [
                         'rgba(200,255,0,0.5)', 'rgba(200,255,0,0.42)',
                         'rgba(123,97,255,0.5)', 'rgba(123,97,255,0.42)',
@@ -1022,12 +1051,7 @@ function initCharts() {
 
     const scatterCtx = document.getElementById('scatterChart');
     if (scatterCtx) {
-        const data = [];
-        for (let i = 0; i < 60; i++) {
-            const actual = Math.random() * 5 + 0.5;
-            const pred = actual + (Math.random() - 0.5) * 0.6;
-            data.push({ x: actual, y: Math.max(0.1, pred) });
-        }
+        const data = [{"x": 4.989, "y": 4.989}, {"x": 4.345, "y": 4.344}, {"x": 4.989, "y": 4.989}, {"x": 1.906, "y": 1.906}, {"x": 1.635, "y": 1.635}, {"x": 2.832, "y": 2.832}, {"x": 1.441, "y": 1.441}, {"x": 1.739, "y": 1.740}, {"x": 3.818, "y": 3.818}, {"x": 3.109, "y": 3.109}, {"x": 2.070, "y": 2.070}, {"x": 1.739, "y": 1.739}, {"x": 5.159, "y": 5.163}, {"x": 4.095, "y": 4.095}, {"x": 4.013, "y": 4.013}, {"x": 3.818, "y": 3.819}, {"x": 1.441, "y": 1.441}, {"x": 0.356, "y": 0.356}, {"x": 2.464, "y": 2.464}, {"x": 0.356, "y": 0.356}, {"x": 4.585, "y": 4.585}, {"x": 3.818, "y": 3.818}, {"x": 4.826, "y": 4.826}, {"x": 2.231, "y": 2.231}, {"x": 5.074, "y": 5.063}, {"x": 0.771, "y": 0.771}, {"x": 3.352, "y": 3.352}, {"x": 2.231, "y": 2.231}, {"x": 1.988, "y": 1.988}, {"x": 3.565, "y": 3.565}, {"x": 2.708, "y": 2.708}, {"x": 4.013, "y": 4.013}, {"x": 2.708, "y": 2.708}, {"x": 1.635, "y": 1.635}, {"x": 2.593, "y": 2.591}, {"x": 5.159, "y": 5.159}, {"x": 0.056, "y": 0.056}, {"x": 4.585, "y": 4.585}, {"x": 4.095, "y": 4.095}, {"x": 4.423, "y": 4.423}, {"x": 0.356, "y": 0.356}, {"x": 3.818, "y": 3.818}, {"x": 1.821, "y": 1.821}, {"x": 3.191, "y": 3.190}, {"x": 4.181, "y": 4.180}, {"x": 2.593, "y": 2.593}, {"x": 4.505, "y": 4.505}, {"x": 2.464, "y": 2.464}, {"x": 0.056, "y": 0.056}, {"x": 4.505, "y": 4.505}, {"x": 1.739, "y": 1.739}, {"x": 4.989, "y": 4.989}, {"x": 4.013, "y": 4.013}, {"x": 2.593, "y": 2.593}, {"x": 4.345, "y": 4.345}, {"x": 1.441, "y": 1.441}, {"x": 2.593, "y": 2.593}, {"x": 4.585, "y": 4.585}, {"x": 2.149, "y": 2.149}, {"x": 3.109, "y": 3.109}];
         new Chart(scatterCtx, {
             type: 'scatter',
             data: {
@@ -1057,10 +1081,9 @@ function initCharts() {
             data: {
                 labels: ['R² Score', 'MAE', 'RMSE', 'Train Speed', 'Inference', 'Interpretability'],
                 datasets: [
-                    { label: 'XGBoost', data: [94, 92, 90, 78, 95, 82], borderColor: '#c8ff00', backgroundColor: 'rgba(200,255,0,0.06)', borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#c8ff00' },
-                    { label: 'Random Forest', data: [91, 88, 85, 85, 90, 88], borderColor: '#36f9ae', backgroundColor: 'rgba(54,249,174,0.04)', borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#36f9ae' },
-                    { label: 'Neural Net', data: [94, 90, 88, 45, 72, 40], borderColor: '#7b61ff', backgroundColor: 'rgba(123,97,255,0.04)', borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#7b61ff' },
-                    { label: 'SVR', data: [89, 82, 78, 92, 88, 65], borderColor: '#ffc233', backgroundColor: 'rgba(255,194,51,0.04)', borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#ffc233' }
+                    { label: 'XGBoost', data: [99, 98, 96, 92, 95, 82], borderColor: '#c8ff00', backgroundColor: 'rgba(200,255,0,0.06)', borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#c8ff00' },
+                    { label: 'Random Forest', data: [99, 96, 98, 98, 90, 88], borderColor: '#36f9ae', backgroundColor: 'rgba(54,249,174,0.04)', borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#36f9ae' },
+                    { label: 'Neural Net', data: [97, 85, 85, 96, 72, 40], borderColor: '#7b61ff', backgroundColor: 'rgba(123,97,255,0.04)', borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#7b61ff' }
                 ]
             },
             options: {
@@ -1195,257 +1218,1181 @@ function initDiscoverModal() {
         }
     });
 }
-/* analyze script */
-// Wait for Monaco loader
-let editor;
-if (typeof require !== 'undefined') {
-    require.config({ paths: { 'vs': 'node_modules/monaco-editor/min/vs' } });
-    require(['vs/editor/editor.main'], function () {
+/* workflow pages script */
+const GREENLAMBDA_KEYS = {
+    session: 'greenlambda.session',
+    analysis: 'greenlambda.analysis',
+    forecast: 'greenlambda.forecast',
+    apiBase: 'greenlambda.apiBase'
+};
 
-        // Define custom Green Lambda Theme
-        monaco.editor.defineTheme('greenLambdaTheme', {
-            base: 'vs-dark',
-            inherit: true,
-            rules: [
-                { token: 'comment', foreground: '555555', fontStyle: 'italic' },
-                { token: 'keyword', foreground: 'c8ff00' }, // Accent
-                { token: 'string', foreground: '36f9ae' },  // Green
-                { token: 'number', foreground: '00f0ff' },  // Cyan
-                { token: 'type.identifier', foreground: '7b61ff' }, // Purple
-                { token: 'identifier', foreground: 'f0f0f0' },
-            ],
-            colors: {
-                'editor.background': '#0d0d0d',
-                'editor.foreground': '#f0f0f0',
-                'editorCursor.foreground': '#c8ff00',
-                'editor.lineHighlightBackground': '#1a1a1a',
-                'editorLineNumber.foreground': '#555555',
-                'editor.selectionBackground': '#2a2a2a'
-            }
-        });
-
-        const defaultCode = `def processUserSession(event, context):
-    """
-    Simulated serverless handler for user telemetry processing.
-    Green Lambda AST Parser will analyze this block automatically.
-    """
-    user_id = event.get("userId")
-    payload = event.get("metrics")
-    
-    # Nested loops raise Cyclomatic Complexity
-    for data in payload:
-        for inner in data.get("tags", []):
-            if inner == "urgent":
-                trigger_alert(user_id)
-                
-    # Blocking DB calls increase I/O wait times
-    user_record = sync_db_fetch(user_id)
-    
-    # High memory footprint array allocation
-    buffer = [0] * 1000000 
-    
-    return {"status": 200, "message": "Processed"}`;
-
-        const editorEl = document.getElementById('monaco-editor');
-        if (editorEl) {
-            editor = monaco.editor.create(editorEl, {
-                value: defaultCode,
-                language: 'python',
-                theme: 'greenLambdaTheme',
-                automaticLayout: true,
-                minimap: { enabled: false },
-                fontSize: 14,
-                fontFamily: "JetBrains Mono",
-                scrollBeyondLastLine: false,
-                roundedSelection: true,
-                padding: { top: 16, bottom: 16 }
-            });
-        }
-
-        // Language switcher
-        const langSelect = document.getElementById('langSelect');
-        if (langSelect) {
-            langSelect.addEventListener('change', (e) => {
-                if (editor) {
-                    monaco.editor.setModelLanguage(editor.getModel(), e.target.value);
-                }
-            });
-        }
-
-        // Clear Button
-        const clrBtn = document.getElementById('clearBtn');
-        if (clrBtn && editor) {
-            clrBtn.addEventListener('click', () => editor.setValue(''));
-        }
-    });
+function getStoredJson(key) {
+    try {
+        const raw = localStorage.getItem(key);
+        return raw ? JSON.parse(raw) : null;
+    } catch {
+        return null;
+    }
 }
 
-// Sidebar Linkages
-function syncSlider(sliderId, labelId, suffix) {
-    const sl = document.getElementById(sliderId);
-    const lb = document.getElementById(labelId);
-    if (sl && lb) {
-        sl.addEventListener('input', (e) => {
-            let val = parseInt(e.target.value).toLocaleString();
-            lb.textContent = `${val} ${suffix}`;
+function setStoredJson(key, value) {
+    localStorage.setItem(key, JSON.stringify(value));
+}
+
+function getSession() {
+    return getStoredJson(GREENLAMBDA_KEYS.session);
+}
+
+function setSession(session) {
+    setStoredJson(GREENLAMBDA_KEYS.session, session);
+}
+
+function getApiBase() {
+    return window.GREENLAMBDA_API_BASE || localStorage.getItem(GREENLAMBDA_KEYS.apiBase) || 'http://127.0.0.1:5000';
+}
+
+function toQuery(params) {
+    const query = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+            query.append(key, String(value));
+        }
+    });
+    return query.toString();
+}
+
+async function apiRequest(path, options = {}) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 20000);
+
+    const method = options.method || 'GET';
+    const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
+    const req = {
+        method,
+        headers,
+        signal: controller.signal
+    };
+
+    if (options.body !== undefined) {
+        req.body = JSON.stringify(options.body);
+    }
+
+    try {
+        const response = await fetch(`${getApiBase()}${path}`, req);
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            throw new Error(payload.message || `Request failed (${response.status})`);
+        }
+        return payload;
+    } finally {
+        clearTimeout(timeout);
+    }
+}
+
+function setBanner(el, type, message) {
+    if (!el) return;
+    el.className = `status-banner show ${type}`;
+    el.textContent = message;
+}
+
+function formatNumber(value) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return '--';
+    return new Intl.NumberFormat('en-IN').format(numeric);
+}
+
+function formatCurrencyInr(value) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return '₹--';
+    return new Intl.NumberFormat('en-IN', {
+        style: 'currency',
+        currency: 'INR',
+        maximumFractionDigits: 2
+    }).format(numeric);
+}
+
+function normalizeFunctions(list) {
+    if (!Array.isArray(list)) return [];
+
+    return list
+        .map((item) => {
+            if (typeof item === 'string') {
+                return { name: item, runtime: 'unknown', memoryMb: '--' };
+            }
+
+            return {
+                name: item.name || item.functionName || item.function_name || 'unknown-function',
+                runtime: item.runtime || item.Runtime || 'unknown',
+                memoryMb: item.memoryMb || item.memory_size || item.memorySize || item.MemorySize || '--'
+            };
+        })
+        .filter((item) => item.name && item.name !== 'unknown-function');
+}
+
+function createDemoConnection(region) {
+    // Functions match actual dataset names used in ML training
+    return {
+        connectionId: `demo-${Date.now()}`,
+        functions: [
+            { name: 'bubble-sort', runtime: 'python3.11', memoryMb: 256 },
+            { name: 'fibonacci', runtime: 'python3.11', memoryMb: 512 },
+            { name: 'matrix-multiply', runtime: 'python3.11', memoryMb: 1024 },
+            { name: 'prime-calculator', runtime: 'python3.11', memoryMb: 256 },
+            { name: 'simple-encryption', runtime: 'nodejs20.x', memoryMb: 128 },
+            { name: 'api-fetcher', runtime: 'nodejs20.x', memoryMb: 512 },
+            { name: 'csv-processor', runtime: 'python3.11', memoryMb: 256 },
+            { name: 'file-reader', runtime: 'python3.11', memoryMb: 512 },
+            { name: 'json-parser', runtime: 'nodejs20.x', memoryMb: 256 },
+            { name: 'image-resizer', runtime: 'python3.11', memoryMb: 1024 }
+        ],
+        region
+    };
+}
+
+function createDemoAnalysis({ baselineRph, functionName }) {
+    // Energy values derived from actual energy_target_wh in ML dataset
+    // (averaged across Small/Medium/Large input sizes per function)
+    // memoryMb and avgDurationMs used for AWS Lambda cost calculation
+    const fnProfiles = {
+        'bubble-sort': { energyWh: 0.394, confidence: 0.943, memoryMb: 256, avgDurationMs: 2890 },
+        'fibonacci': { energyWh: 1.081, confidence: 0.951, memoryMb: 512, avgDurationMs: 1860 },
+        'matrix-multiply': { energyWh: 1.533, confidence: 0.928, memoryMb: 1024, avgDurationMs: 520 },
+        'prime-calculator': { energyWh: 1.822, confidence: 0.962, memoryMb: 256, avgDurationMs: 380 },
+        'simple-encryption': { energyWh: 2.069, confidence: 0.937, memoryMb: 128, avgDurationMs: 62 },
+        'api-fetcher': { energyWh: 2.337, confidence: 0.914, memoryMb: 512, avgDurationMs: 410 },
+        'csv-processor': { energyWh: 2.711, confidence: 0.906, memoryMb: 256, avgDurationMs: 185 },
+        'file-reader': { energyWh: 3.024, confidence: 0.921, memoryMb: 512, avgDurationMs: 210 },
+        'json-parser': { energyWh: 3.271, confidence: 0.898, memoryMb: 256, avgDurationMs: 108 },
+        'image-resizer': { energyWh: 1.640, confidence: 0.932, memoryMb: 1024, avgDurationMs: 740 }
+    };
+
+    const profile = fnProfiles[functionName] || { energyWh: 1.5, confidence: 0.93, memoryMb: 512, avgDurationMs: 500 };
+    const energyWhPerInvocation = profile.energyWh;
+    const confidence = profile.confidence;
+
+    const monthlyInvocations = Number(baselineRph || 10000) * 24 * 30;
+    const monthlyEnergyKwh = (monthlyInvocations * energyWhPerInvocation) / 1000;
+
+    // India grid emission factor: 0.708 kg CO₂ per kWh (CEA 2023)
+    const monthlyCarbonKg = monthlyEnergyKwh * 0.708;
+
+    // AWS Lambda pricing (ap-south-1 Mumbai region)
+    // Compute: $0.0000166667 per GB-second → ₹0.001392 per GB-second (at ₹83.5/USD)
+    // Request: $0.20 per 1M requests → ₹16.70 per 1M requests
+    const gbSeconds = (profile.memoryMb / 1024) * (profile.avgDurationMs / 1000);
+    const computeCostPerInvocation = gbSeconds * 0.001392;  // ₹ per invocation
+    const requestCostPerInvocation = 16.70 / 1_000_000;     // ₹ per invocation
+    const monthlyCostInr = monthlyInvocations * (computeCostPerInvocation + requestCostPerInvocation);
+
+    return {
+        energyWhPerInvocation,
+        confidence,
+        monthlyInvocations,
+        monthlyCarbonKg,
+        monthlyCostInr
+    };
+}
+
+function createDemoSpike({ baselineRph, multiplier, durationHours }, analysis) {
+    const baseReq = Number(baselineRph || 10000);
+    const mul = Number(multiplier || 20);
+    const duration = Number(durationHours || 72);
+    const peakReqPerHour = baseReq * mul;
+    const energyWhPerInvocation = Number(analysis.energyWhPerInvocation || 1.5);
+    const totalInvocations = peakReqPerHour * duration;
+    const totalEnergyKwh = (totalInvocations * energyWhPerInvocation) / 1000;
+
+    // India grid emission factor: 0.708 kg CO₂ per kWh
+    const totalCarbonKg = totalEnergyKwh * 0.708;
+
+    // Estimate cost using analysis monthlyCostInr ratio scaled to spike volume
+    const costPerInvocation = analysis.monthlyCostInr
+        ? analysis.monthlyCostInr / analysis.monthlyInvocations
+        : 0.0015; // fallback ₹ per invocation
+    const totalCostInr = totalInvocations * costPerInvocation;
+
+    const hourly = [];
+    for (let hour = 1; hour <= duration; hour += 1) {
+        // Simulate realistic traffic: ramp up, plateau, slight decay
+        const progress = hour / duration;
+        let shapeFactor;
+        if (progress < 0.1) shapeFactor = 0.6 + (progress / 0.1) * 0.4;   // ramp up
+        else if (progress < 0.85) shapeFactor = 1.0;                              // plateau
+        else shapeFactor = 1.0 - (progress - 0.85) * 1.5;   // decay
+
+        const jitter = 0.94 + Math.random() * 0.12;  // ±6% realistic jitter
+        const req = Math.round(peakReqPerHour * shapeFactor * jitter);
+        const energyKwh = (req * energyWhPerInvocation) / 1000;
+        hourly.push({
+            hour,
+            predictedReqPerHour: req,
+            predictedEnergyKwh: Number(energyKwh.toFixed(4))
+        });
+    }
+
+    return {
+        totals: {
+            energyKwh: Number(totalEnergyKwh.toFixed(3)),
+            carbonKg: Number(totalCarbonKg.toFixed(3)),
+            costInr: Number(totalCostInr.toFixed(2)),
+            peakReqPerHour
+        },
+        hourly
+    };
+}
+
+function createDemoLiveMetrics(predictedReqPerHour) {
+    const predicted = Number(predictedReqPerHour || 200000);
+    // Realistic drift: most samples within ±6%, occasional outliers up to ±12%
+    const isOutlier = Math.random() < 0.15;
+    const driftRange = isOutlier ? 0.12 : 0.06;
+    const drift = 1 + (Math.random() * 2 - 1) * driftRange;
+    const actual = Math.round(predicted * drift);
+    const deviationPct = ((actual - predicted) / predicted) * 100;
+
+    return {
+        predictedReqPerHour: predicted,
+        actualReqPerHour: actual,
+        deviationPct: Number(deviationPct.toFixed(2)),
+        alerts: Math.abs(deviationPct) > 8
+            ? [`Traffic deviation is ${deviationPct.toFixed(1)}% from forecast — review auto-scaling settings.`]
+            : []
+    };
+}
+
+/* ─── AUTH HELPERS ─────────────────────────────────────── */
+
+async function checkAuth() {
+    if (!window.supabase) return null;
+    try {
+        const { data: { session } } = await window.supabase.auth.getSession();
+        const user = session?.user || null;
+
+        if (user) {
+            // Check if local session has AWS functions. If not, try to fetch from DB.
+            const localSession = getSession();
+            if (!localSession?.functions?.length) {
+                const { data: conns } = await window.supabase
+                    .from('aws_connections')
+                    .select('*, lambda_functions(function_name, runtime, memory_mb)')
+                    .eq('user_id', user.id)
+                    .order('created_at', { ascending: false })
+                    .limit(1);
+
+                if (conns && conns.length > 0) {
+                    const dbConn = conns[0];
+                    const fnList = (dbConn.lambda_functions || []).map(f => ({
+                        name: f.function_name,
+                        runtime: f.runtime,
+                        memoryMb: f.memory_mb
+                    }));
+
+                    setSession({
+                        connectionId: dbConn.id,
+                        region: dbConn.region,
+                        accountAlias: dbConn.account_alias,
+                        mode: 'live',
+                        functions: fnList,
+                        connectedAt: dbConn.created_at
+                    });
+                }
+            }
+        }
+        return user;
+    } catch { return null; }
+}
+
+function initLoginPage() {
+    // If already logged in, skip straight to dashboard
+    checkAuth().then(user => {
+        if (user) window.location.href = 'dashboard.html';
+    });
+
+    // ── Flip toggle (checkbox → rotateY) ────────────────
+    const toggle = document.getElementById('authToggle');
+    const flipCard = document.getElementById('flipCardInner');
+    const labelLogin = document.getElementById('labelLogin');
+    const labelSignup = document.getElementById('labelSignup');
+
+    if (toggle && flipCard) {
+        toggle.addEventListener('change', () => {
+            const isSignup = toggle.checked;
+            flipCard.classList.toggle('flipped', isSignup);
+            labelLogin.classList.toggle('active', !isSignup);
+            labelSignup.classList.toggle('active', isSignup);
+        });
+        // Also let clicking the labels toggle the switch
+        labelLogin?.addEventListener('click', () => { toggle.checked = false; toggle.dispatchEvent(new Event('change')); });
+        labelSignup?.addEventListener('click', () => { toggle.checked = true; toggle.dispatchEvent(new Event('change')); });
+    }
+
+    // ── Login form (front face of flip card) ──────────────
+    const loginForm = document.getElementById('loginForm');
+    const loginStatus = document.getElementById('loginStatus');
+    const loginSubmit = document.getElementById('loginSubmitBtn');
+    const forgotBtn = document.getElementById('forgotPasswordBtn');
+
+    if (loginForm) {
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('loginEmail').value.trim();
+            const password = document.getElementById('loginPassword').value;
+            loginSubmit.disabled = true;
+            setBanner(loginStatus, 'loading', 'Logging in\u2026');
+            try {
+                if (!window.supabase) throw new Error('Supabase not initialised.');
+                const { error } = await window.supabase.auth.signInWithPassword({ email, password });
+                if (error) throw error;
+                window.location.href = 'dashboard.html';
+            } catch (err) {
+                setBanner(loginStatus, 'error', err.message || 'Login failed.');
+                loginSubmit.disabled = false;
+            }
+        });
+    }
+
+    if (forgotBtn) {
+        forgotBtn.addEventListener('click', async () => {
+            const email = document.getElementById('loginEmail')?.value.trim();
+            if (!email) { setBanner(loginStatus, 'error', 'Enter your email first.'); return; }
+            setBanner(loginStatus, 'loading', 'Sending reset link\u2026');
+            const { error } = await window.supabase.auth.resetPasswordForEmail(email, {
+                redirectTo: window.location.origin + '/login.html'
+            });
+            if (error) setBanner(loginStatus, 'error', error.message);
+            else setBanner(loginStatus, 'ok', 'Reset email sent! Check your inbox.');
+        });
+    }
+
+    // ── Signup form (back face of flip card) ───────────────
+    const signupForm = document.getElementById('signupForm');
+    const signupStatus = document.getElementById('signupStatus');
+    const signupSubmit = document.getElementById('signupSubmitBtn');
+
+    if (signupForm) {
+        signupForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('signupEmail').value.trim();
+            const password = document.getElementById('signupPassword').value;
+            signupSubmit.disabled = true;
+            setBanner(signupStatus, 'loading', 'Creating account\u2026');
+            try {
+                if (!window.supabase) throw new Error('Supabase not initialised.');
+                const { data, error } = await window.supabase.auth.signUp({ email, password });
+                if (error) throw error;
+                if (data.user) {
+                    await window.supabase.from('profiles').upsert([{ id: data.user.id, email: data.user.email }]);
+                }
+                setBanner(signupStatus, 'ok', 'Account created! Redirecting\u2026');
+                setTimeout(() => window.location.href = 'dashboard.html', 1800);
+            } catch (err) {
+                setBanner(signupStatus, 'error', err.message || 'Sign-up failed.');
+                signupSubmit.disabled = false;
+            }
         });
     }
 }
-syncSlider('memSlider', 'memLbl', 'MB');
-syncSlider('freqSlider', 'freqLbl', '/ hr');
-syncSlider('timeSlider', 'timeLbl', 'sec');
 
-// Engine Analysis Logic
-const analyzeBtn = document.getElementById('analyzeBtn');
-const loader = document.getElementById('aiLoader');
-const dash = document.getElementById('resultsDash');
-const steps = document.getElementById('aiSteps');
+/* ─── FUNCTION LIST RENDERER ───────────────────────────── */
 
-const waitMs = (ms) => new Promise(res => setTimeout(res, ms));
+function renderFunctionList(functions, listEl, countEl) {
+    if (!listEl || !countEl) return;
 
-const runAnalysis = async () => {
-    if (!editor || !editor.getValue().trim()) {
-        alert("Please input function code first.");
+    listEl.innerHTML = '';
+    countEl.textContent = `${functions.length} functions`;
+
+    functions.forEach((fn) => {
+        const item = document.createElement('div');
+        item.className = 'function-item';
+        item.innerHTML = `
+            <span class="function-item-name">${fn.name}</span>
+            <span class="function-item-meta">${fn.runtime} • ${fn.memoryMb} MB</span>
+        `;
+        listEl.appendChild(item);
+    });
+}
+
+async function initConnectPage() {
+    // Auth guard — redirect unauthenticated users to the login page
+    const user = await checkAuth();
+    if (!user) {
+        window.location.href = 'login.html';
         return;
     }
 
-    // Reset view
-    dash.style.display = 'none';
-    loader.style.display = 'flex';
+    const form = document.getElementById('connectAwsForm');
+    const status = document.getElementById('connectStatus');
+    const wrap = document.getElementById('connectedFunctionsWrap');
+    const list = document.getElementById('functionList');
+    const count = document.getElementById('functionCount');
+    const connectBtn = document.getElementById('connectAwsBtn');
 
-    // Sequence
-    steps.textContent = "INITIALIZING AST PARSER...";
-    await waitMs(1000);
-    steps.textContent = "EXTRACTING CYCLOMATIC COMPLEXITY...";
-    await waitMs(800);
-    steps.textContent = "MERGING DYNAMIC METADATA...";
-    await waitMs(900);
-    steps.textContent = "INFERENCING XGBoost TENSORS...";
-    await waitMs(1200);
+    if (!form) return;
 
-    // Dynamic calculations
-    const code = editor.getValue();
-    const lines = code.split('\n').filter(l => l.trim().length > 0).length;
-    const loopMatches = code.match(/\b(for|while|forEach)\b/g);
-    const loop_count = loopMatches ? loopMatches.length : 0;
-    const ioMatch = code.match(/\b(fetch|read|db|query|axios|http)\b/gi);
-    const io_calls = ioMatch ? ioMatch.length : 3;
-    const innerLoops = code.match(/for.*\{[\s\S]*for/g);
-    const loop_depth = innerLoops ? 2 : (loop_count > 0 ? 1 : 0);
-
-    // Static display Page 1
-    document.getElementById('st-lines').textContent = `${lines} L / ${loop_depth}D`;
-    document.getElementById('st-io').textContent = `${io_calls} sync ops`;
-    document.getElementById('st-loop-count').textContent = `${loop_count} loops`;
-
-    const raw_run_ms = Math.round((lines * 0.8) + (loop_depth * 12) + (io_calls * 15));
-    const est_rt = raw_run_ms > 0 ? raw_run_ms : 12;
-    document.getElementById('st-runtime').textContent = `~${est_rt} ms`;
-
-    const rtBadge = document.getElementById('runtimeBadge');
-    if (est_rt < 100) { rtBadge.textContent = 'FAST'; rtBadge.style.background = 'var(--green)'; rtBadge.style.color = '#111'; }
-    else if (est_rt <= 500) { rtBadge.textContent = 'NORMAL'; rtBadge.style.background = 'var(--amber)'; rtBadge.style.color = '#111'; }
-    else { rtBadge.textContent = 'SLOW'; rtBadge.style.background = 'var(--accent)'; rtBadge.style.color = '#fff'; }
-
-    // Page 2 KPI inputs
-    const mem = parseInt(document.getElementById('memSlider').value) || 1024;
-    const freq = parseInt(document.getElementById('freqSlider').value) || 2500;
-    const timeout = parseInt(document.getElementById('timeSlider').value) || 30;
-    const coldToggle = document.getElementById('coldToggle') ? document.getElementById('coldToggle').checked : true;
-
-    const energy_wh = 0.82;
-    const eff_score = 52;
-
-    const carbon = energy_wh * 0.000233 * freq * 720;
-    const resCO2 = document.getElementById('resCarbon');
-    resCO2.innerHTML = carbon.toFixed(2) + ' <span class="result-unit">kg CO₂/mo</span>';
-    if (carbon > 5) resCO2.style.color = 'var(--accent)';
-    else if (carbon >= 1) resCO2.style.color = 'var(--amber)';
-    else resCO2.style.color = 'var(--green)';
-    document.getElementById('resCarbonEq').textContent = `≈ ${(carbon / 0.21).toFixed(1)} km driven`;
-
-    const computeCost = ((mem / 1024) * est_rt * 0.0000000167 * freq * 720) * 84;
-    const reqCost = (freq * 720 * 0.0000002) * 84;
-    const totalCost = computeCost + reqCost;
-    document.getElementById('resRunCost').innerHTML = '₹' + totalCost.toFixed(2) + ' <span class="result-unit">/ mo</span>';
-    document.getElementById('resRunCostSub').setAttribute('title', `Compute: ₹${computeCost.toFixed(2)} | Requests: ₹${reqCost.toFixed(2)}`);
-
-    // Resource Breakdown elements update
-    const arrPenalty = (code.includes('[]') || code.includes('Array')) ? 45 : 10;
-    const memFt = (mem * 0.65) + arrPenalty;
-    document.getElementById('rb-mem-val').textContent = memFt.toFixed(0) + ' MB';
-
-    document.getElementById('rb-time-val').textContent = est_rt + ' ms';
-    document.getElementById('rb-energy-val').textContent = energy_wh.toFixed(3) + ' Wh';
-
-    let coldMs = 0;
-    if (coldToggle) coldMs = 250 + (mem / 1024) * 400;
-    document.getElementById('rb-cold-val').textContent = coldMs.toFixed(0) + ' ms';
-
-    // AWS Insights text dynamically updated
-    const asMemTun = document.getElementById('aws-mem-tun');
-    const asMemSav = document.getElementById('aws-mem-saving');
-    if (mem > 1024) {
-        asMemTun.textContent = "You're over-provisioned. Drop to 512MB to cut compute cost by ~48% with minimal latency impact.";
-        if (asMemSav) asMemSav.textContent = `Potential saving: ~₹${(computeCost * 0.48).toFixed(2)} / mo`;
-    } else if (mem < 512) {
-        asMemTun.textContent = "Low memory may cause cold starts. Consider 512MB minimum.";
-        if (asMemSav) asMemSav.textContent = '';
-    } else {
-        asMemTun.textContent = "Memory is well sized for this workload type.";
-        if (asMemSav) asMemSav.textContent = '';
+    const existing = getSession();
+    if (existing?.functions?.length) {
+        wrap.hidden = false;
+        renderFunctionList(existing.functions, list, count);
+        setBanner(status, 'ok', `Your AWS connection was loaded securely from your account! You can go straight to Analysis, or reconnect to refresh your functions.`);
     }
 
-    const asInvPat = document.getElementById('aws-inv-pat');
-    if (freq > 5000) {
-        let savPat = ((freq * 720 * 0.0000005) * 84).toFixed(2);
-        asInvPat.textContent = `High frequency detected. Enable Provisioned Concurrency to eliminate cold starts and save ~₹${savPat}/mo.`;
-    } else if (freq < 100) {
-        asInvPat.textContent = "Low frequency. Keep on-demand — provisioned concurrency would cost more than it saves.";
-    } else {
-        asInvPat.textContent = "Moderate load. Monitor cold start rate before committing to provisioned concurrency.";
-    }
+    form.addEventListener('submit', async (event) => {
+        event.preventDefault();
 
-    const asTimeConf = document.getElementById('aws-time-conf');
-    if (timeout > (est_rt * 3 / 1000)) {
-        let recT = Math.ceil((est_rt * 1.5) / 1000) || 1;
-        let diff = Math.round((timeout * 1000) / est_rt);
-        asTimeConf.textContent = `Your timeout is ${diff}x your estimated runtime. Reduce to ${recT}s to prevent runaway invocations from inflating costs.`;
-    } else if (timeout < (est_rt * 1.5 / 1000)) {
-        asTimeConf.textContent = "Timeout is dangerously close to estimated runtime. Increase to avoid false timeouts.";
-    } else {
-        asTimeConf.textContent = "Timeout is appropriately set.";
-    }
+        const payload = {
+            accessKeyId: document.getElementById('awsAccessKey')?.value?.trim(),
+            secretAccessKey: document.getElementById('awsSecretKey')?.value?.trim(),
+            sessionToken: document.getElementById('awsSessionToken')?.value?.trim(),
+            region: document.getElementById('awsRegion')?.value,
+            accountAlias: document.getElementById('awsAccountAlias')?.value?.trim()
+        };
 
-    loader.style.display = 'none';
+        if (!payload.accessKeyId || !payload.secretAccessKey || !payload.region) {
+            setBanner(status, 'error', 'Access key, secret key, and region are required.');
+            return;
+        }
 
-    // Reveal Dashboard safely
-    dash.style.display = 'block';
+        connectBtn.disabled = true;
+        setBanner(status, 'loading', 'Connecting to AWS and discovering Lambda functions...');
 
-    // Update active prediction gauge & animations dynamically
-    setTimeout(() => {
-        let dashOffset = 141.37 * (1 - (eff_score / 100));
-        document.getElementById('gaugeMeter').style.strokeDashoffset = dashOffset;
-        document.getElementById('gaugeMeter').style.stroke = "var(--accent)";
-        document.getElementById('gaugeVal').textContent = eff_score;
+        let response;
+        let mode = 'live';
 
-        let memP = Math.min((memFt / mem) * 100, 100);
-        document.getElementById('rb-mem-bar').style.width = memP + '%';
-        let rtP = Math.min((est_rt / 1000) * 100, 100);
-        document.getElementById('rb-time-bar').style.width = rtP + '%';
-        let enP = Math.max(0, 100 - eff_score);
-        document.getElementById('rb-energy-bar').style.width = enP + '%';
-        let coldP = Math.min((coldMs / 1000) * 100, 100);
-        document.getElementById('rb-cold-bar').style.width = coldP + '%';
-    }, 100);
+        try {
+            response = await apiRequest('/connect-aws', { method: 'POST', body: payload });
+        } catch (error) {
+            mode = 'demo';
+            response = createDemoConnection(payload.region);
+            setBanner(status, 'warn', `Backend unavailable (${error.message}). Showing demo connection data.`);
+        }
 
-    // Scroll down to results smoothly
-    window.scrollTo({
-        top: dash.offsetTop - 100,
-        behavior: "smooth"
+        const functions = normalizeFunctions(response.functions || response.lambdaFunctions || []);
+
+        const session = {
+            connectionId: response.connectionId || response.connection_id || `local-${Date.now()}`,
+            region: response.region || payload.region,
+            accountAlias: payload.accountAlias || response.accountAlias || '',
+            mode,
+            functions,
+            connectedAt: new Date().toISOString()
+        };
+
+        // --- SUPABASE: Save Connection and Lambda Functions ---
+        if (window.supabase) {
+            try {
+                // 1. Insert into aws_connections
+                const { data: connData, error: connErr } = await window.supabase
+                    .from('aws_connections')
+                    .insert([{
+                        user_id: user.id,
+                        account_alias: session.accountAlias || 'GreenLambda Demo Account',
+                        region: session.region || 'ap-south-1'
+                    }])
+                    .select();
+
+                if (connErr) throw connErr;
+
+                const dbConnId = connData[0].id;
+                session.dbConnectionId = dbConnId; // Save this ID in local session for later
+
+                // 2. Insert into lambda_functions
+                if (functions.length > 0) {
+                    const fnInserts = functions.map(fn => ({
+                        connection_id: dbConnId,
+                        function_name: fn.name,
+                        runtime: fn.runtime || 'nodejs18.x',
+                        memory_mb: fn.memoryMb || 128
+                    }));
+
+                    const { error: fnErr } = await window.supabase
+                        .from('lambda_functions')
+                        .insert(fnInserts);
+
+                    if (fnErr) throw fnErr;
+                }
+                console.log("✅ Successfully saved AWS connection & functions to Supabase!");
+            } catch (err) {
+                console.error("❌ Supabase Save Error:", err);
+                setBanner(status, 'warn', `Saved locally, but failed to save to database: ${err.message}`);
+            }
+        }
+
+        setSession(session);
+        wrap.hidden = false;
+        renderFunctionList(functions, list, count);
+
+        if (mode === 'live') {
+            setBanner(status, 'ok', `AWS connected successfully. ${functions.length} Lambda function(s) discovered.`);
+        }
+
+        connectBtn.disabled = false;
     });
-};
+}
 
-if (analyzeBtn) {
-    analyzeBtn.addEventListener('click', runAnalysis);
+function initAnalyzePage() {
+    const session = getSession();
+    const hint = document.getElementById('analyzeConnectionHint');
+    const form = document.getElementById('analyzeFunctionForm');
+    const fnSelect = document.getElementById('functionSelect');
+    const baselineInput = document.getElementById('baselineTraffic');
+    const modelBar = document.getElementById('modelSelectorBar');
+    const predictionPanel = document.getElementById('predictionPanel');
+    const spikeForm = document.getElementById('spikeForm');
+    const spikePanel = document.getElementById('spikeResultPanel');
+
+    if (!form || !fnSelect || !baselineInput || !modelBar) return;
+
+    if (!session?.functions?.length) {
+        setBanner(hint, 'warn', 'No AWS session found. Connect your AWS account first on the Connect page.');
+        form.querySelectorAll('input, select, button').forEach((el) => {
+            el.disabled = true;
+        });
+        if (spikeForm) {
+            spikeForm.querySelectorAll('input, select, button').forEach((el) => {
+                el.disabled = true;
+            });
+        }
+        return;
+    }
+
+    setBanner(hint, 'ok', `Connected to ${session.region}. Choose a function to begin analysis.`);
+
+    session.functions.forEach((fn) => {
+        const option = document.createElement('option');
+        option.value = fn.name;
+        option.textContent = `${fn.name} (${fn.runtime})`;
+        fnSelect.appendChild(option);
+    });
+
+    let activeModel = 'xgboost';
+    modelBar.querySelectorAll('.ms-btn').forEach((button) => {
+        button.addEventListener('click', () => {
+            modelBar.querySelectorAll('.ms-btn').forEach((other) => other.classList.remove('active'));
+            button.classList.add('active');
+            activeModel = button.dataset.model || 'xgboost';
+        });
+    });
+
+    let latestAnalysis = getStoredJson(GREENLAMBDA_KEYS.analysis) || null;
+    let spikeChart = null;
+
+    form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+
+        const functionName = fnSelect.value;
+        const baselineRph = Number(baselineInput.value || 0);
+
+        if (!functionName || !baselineRph) {
+            setBanner(hint, 'error', 'Select a function and enter baseline traffic to continue.');
+            return;
+        }
+
+        setBanner(hint, 'loading', 'Running ML prediction for selected function...');
+
+        let response;
+        let mode = 'live';
+
+        try {
+            response = await apiRequest('/analyze-function', {
+                method: 'POST',
+                body: {
+                    connectionId: session.connectionId,
+                    functionName,
+                    model: activeModel,
+                    baselineRph
+                }
+            });
+        } catch (error) {
+            mode = 'demo';
+            response = createDemoAnalysis({ baselineRph, functionName });
+            setBanner(hint, 'warn', `Backend unavailable (${error.message}). Showing demo analysis values.`);
+        }
+
+        const energyWhPerInvocation = Number(
+            response.energyWhPerInvocation ||
+            response.energy_per_invocation_wh ||
+            response.energy_target_wh ||
+            0
+        );
+        const confidence = Number(response.confidence || response.modelConfidence || 0.9);
+        const monthlyInvocations = Number(response.monthlyInvocations || (baselineRph * 24 * 30));
+        const monthlyCarbonKg = Number(
+            response.monthlyCarbonKg ||
+            response.carbonKg ||
+            (((monthlyInvocations * energyWhPerInvocation) / 1000) * 0.5)
+        );
+        const monthlyCostInr = Number(
+            response.monthlyCostInr ||
+            response.costInr ||
+            (((monthlyInvocations * energyWhPerInvocation) / 1000) * 8.4)
+        );
+
+        latestAnalysis = {
+            functionName,
+            baselineRph,
+            model: activeModel,
+            mode,
+            energyWhPerInvocation,
+            confidence,
+            monthlyInvocations,
+            monthlyCarbonKg,
+            monthlyCostInr,
+            analyzedAt: new Date().toISOString()
+        };
+
+        // --- SUPABASE: Save ML Analysis ---
+        if (window.supabase && session?.dbConnectionId) {
+            try {
+                const { data: fnData } = await window.supabase
+                    .from('lambda_functions')
+                    .select('id')
+                    .eq('connection_id', session.dbConnectionId)
+                    .eq('function_name', functionName)
+                    .single();
+
+                if (fnData) {
+                    const { data: analysisData, error: anErr } = await window.supabase
+                        .from('ml_analysis')
+                        .insert([{
+                            function_id: fnData.id,
+                            model_used: activeModel,
+                            baseline_rph: baselineRph,
+                            energy_wh: energyWhPerInvocation,
+                            confidence: confidence,
+                            monthly_invocations: monthlyInvocations,
+                            monthly_carbon_kg: monthlyCarbonKg,
+                            monthly_cost_inr: monthlyCostInr
+                        }])
+                        .select();
+
+                    if (!anErr && analysisData) {
+                        latestAnalysis.dbAnalysisId = analysisData[0].id; // Save for spike forecast
+                        console.log("✅ ML Analysis saved to Supabase!");
+                    }
+                }
+            } catch (err) {
+                console.error("❌ Supabase Analysis Save Error:", err);
+            }
+        }
+
+        setStoredJson(GREENLAMBDA_KEYS.analysis, latestAnalysis);
+
+        document.getElementById('selectedFnLabel').textContent = `Function: ${functionName}`;
+        document.getElementById('predEnergy').innerHTML = `${energyWhPerInvocation.toFixed(3)} <span class="result-unit">Wh</span>`;
+        document.getElementById('predConfidence').textContent = `Confidence: ${(confidence * 100).toFixed(1)}%`;
+        document.getElementById('predCarbon').innerHTML = `${monthlyCarbonKg.toFixed(2)} <span class="result-unit">kg CO₂</span>`;
+        document.getElementById('predCost').textContent = formatCurrencyInr(monthlyCostInr);
+        document.getElementById('predInvocations').textContent = formatNumber(monthlyInvocations);
+        predictionPanel.hidden = false;
+
+        if (mode === 'live') {
+            setBanner(hint, 'ok', 'Function analysis complete. Use spike simulator for event forecasting.');
+        }
+    });
+
+    const presetRow = document.getElementById('spikePresetRow');
+    const multiplierInput = document.getElementById('trafficMultiplier');
+    if (presetRow && multiplierInput) {
+        presetRow.querySelectorAll('.chip').forEach((chip) => {
+            chip.addEventListener('click', () => {
+                presetRow.querySelectorAll('.chip').forEach((other) => other.classList.remove('active'));
+                chip.classList.add('active');
+                multiplierInput.value = chip.dataset.multiplier || '20';
+            });
+        });
+    }
+
+    if (spikeForm) {
+        spikeForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+
+            if (!latestAnalysis) {
+                setBanner(hint, 'error', 'Run function analysis before predicting spike impact.');
+                return;
+            }
+
+            const multiplier = Number(document.getElementById('trafficMultiplier')?.value || 20);
+            const durationHours = Number(document.getElementById('spikeDurationHours')?.value || 72);
+
+            setBanner(hint, 'loading', 'Generating spike forecast...');
+
+            let response;
+            let mode = 'live';
+
+            try {
+                response = await apiRequest('/predict-spike', {
+                    method: 'POST',
+                    body: {
+                        connectionId: session.connectionId,
+                        functionName: latestAnalysis.functionName,
+                        model: latestAnalysis.model,
+                        baselineRph: latestAnalysis.baselineRph,
+                        multiplier,
+                        durationHours
+                    }
+                });
+            } catch (error) {
+                mode = 'demo';
+                response = createDemoSpike({ baselineRph: latestAnalysis.baselineRph, multiplier, durationHours }, latestAnalysis);
+                setBanner(hint, 'warn', `Backend unavailable (${error.message}). Showing demo spike forecast.`);
+            }
+
+            const totals = response.totals || {};
+            const hourly = Array.isArray(response.hourly) ? response.hourly : [];
+
+            const energyKwh = Number(totals.energyKwh || totals.totalEnergyKwh || 0);
+            const carbonKg = Number(totals.carbonKg || totals.totalCarbonKg || 0);
+            const costInr = Number(totals.costInr || totals.totalCostInr || 0);
+            const peakReqPerHour = Number(totals.peakReqPerHour || (latestAnalysis.baselineRph * multiplier));
+
+            document.getElementById('spikeEnergy').innerHTML = `${energyKwh.toFixed(3)} <span class="result-unit">kWh</span>`;
+            document.getElementById('spikeCarbon').innerHTML = `${carbonKg.toFixed(3)} <span class="result-unit">kg CO₂</span>`;
+            document.getElementById('spikeCost').textContent = formatCurrencyInr(costInr);
+            document.getElementById('spikePeakReq').textContent = formatNumber(peakReqPerHour);
+            spikePanel.hidden = false;
+
+            setStoredJson(GREENLAMBDA_KEYS.forecast, {
+                functionName: latestAnalysis.functionName,
+                predictedReqPerHour: peakReqPerHour,
+                durationHours,
+                generatedAt: new Date().toISOString(),
+                mode,
+                totals: { energyKwh, carbonKg, costInr },
+                hourly
+            });
+
+            // --- SUPABASE: Save Spike Forecast ---
+            if (window.supabase && latestAnalysis.dbAnalysisId) {
+                try {
+                    const { error: spikeErr } = await window.supabase
+                        .from('spike_forecasts')
+                        .insert([{
+                            analysis_id: latestAnalysis.dbAnalysisId,
+                            multiplier: multiplier,
+                            duration_hours: durationHours,
+                            peak_req_per_hour: peakReqPerHour,
+                            total_energy_kwh: energyKwh,
+                            total_carbon_kg: carbonKg,
+                            total_cost_inr: costInr,
+                            forecast_data: hourly
+                        }]);
+                    if (!spikeErr) {
+                        console.log("✅ Spike forecast saved to Supabase!");
+                    } else {
+                        throw spikeErr;
+                    }
+                } catch (err) {
+                    console.error("❌ Supabase Spike Save Error:", err);
+                }
+            }
+
+            const chartCanvas = document.getElementById('spikeForecastChart');
+            if (typeof Chart !== 'undefined' && chartCanvas) {
+                const labels = hourly.map((item) => `H${item.hour}`);
+                const reqData = hourly.map((item) => Number(item.predictedReqPerHour || item.reqPerHour || 0));
+                const energyData = hourly.map((item) => Number(item.predictedEnergyKwh || item.energyKwh || 0));
+
+                if (spikeChart) spikeChart.destroy();
+
+                spikeChart = new Chart(chartCanvas, {
+                    type: 'line',
+                    data: {
+                        labels,
+                        datasets: [
+                            {
+                                label: 'Req/Hour',
+                                data: reqData,
+                                borderColor: '#c8ff00',
+                                backgroundColor: 'rgba(200,255,0,0.06)',
+                                yAxisID: 'yReq',
+                                tension: 0.35,
+                                borderWidth: 2,
+                                pointRadius: 0
+                            },
+                            {
+                                label: 'Energy kWh',
+                                data: energyData,
+                                borderColor: '#7b61ff',
+                                backgroundColor: 'rgba(123,97,255,0.06)',
+                                yAxisID: 'yEnergy',
+                                tension: 0.35,
+                                borderWidth: 2,
+                                pointRadius: 0
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { labels: { color: '#8a8a8a' } }
+                        },
+                        scales: {
+                            x: { ticks: { color: '#555' }, grid: { color: 'rgba(255,255,255,0.03)' } },
+                            yReq: {
+                                position: 'left',
+                                ticks: { color: '#8a8a8a' },
+                                grid: { color: 'rgba(255,255,255,0.03)' }
+                            },
+                            yEnergy: {
+                                position: 'right',
+                                ticks: { color: '#8a8a8a' },
+                                grid: { drawOnChartArea: false }
+                            }
+                        }
+                    }
+                });
+            }
+
+            if (mode === 'live') {
+                setBanner(hint, 'ok', 'Spike forecast generated successfully. Open live monitoring dashboard next.');
+            }
+        });
+    }
+}
+
+function initDashboardPage() {
+    const session = getSession();
+    const hint = document.getElementById('liveConnectionHint');
+    const fnSelect = document.getElementById('liveFunctionSelect');
+    const refreshIntervalSelect = document.getElementById('liveRefreshInterval');
+    const autoToggle = document.getElementById('liveAutoToggle');
+    const refreshNowBtn = document.getElementById('liveRefreshNowBtn');
+    const alertBox = document.getElementById('liveAlertBox');
+
+    if (!fnSelect || !refreshIntervalSelect || !autoToggle || !refreshNowBtn) return;
+
+    if (!session?.functions?.length) {
+        setBanner(hint, 'warn', 'No AWS session found. Connect and analyze a function first.');
+        fnSelect.disabled = true;
+        refreshNowBtn.disabled = true;
+        return;
+    }
+
+    setBanner(hint, 'ok', `Monitoring enabled for ${session.region}. Choose a function to start.`);
+    session.functions.forEach((fn) => {
+        const option = document.createElement('option');
+        option.value = fn.name;
+        option.textContent = `${fn.name} (${fn.runtime})`;
+        fnSelect.appendChild(option);
+    });
+
+    const forecast = getStoredJson(GREENLAMBDA_KEYS.forecast);
+    if (forecast?.functionName) {
+        fnSelect.value = forecast.functionName;
+    }
+
+    const compareCanvas = document.getElementById('liveCompareChart');
+    const volumeCanvas = document.getElementById('liveInvocationChart');
+    const sampleBody = document.getElementById('liveSampleBody');
+
+    let compareChart = null;
+    let volumeChart = null;
+    let timer = null;
+
+    if (typeof Chart !== 'undefined' && compareCanvas && volumeCanvas) {
+        compareChart = new Chart(compareCanvas, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [
+                    { label: 'Predicted', data: [], borderColor: '#c8ff00', borderWidth: 2, tension: 0.35, pointRadius: 0 },
+                    { label: 'Actual', data: [], borderColor: '#7b61ff', borderWidth: 2, tension: 0.35, pointRadius: 0 }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: { ticks: { color: '#555' }, grid: { color: 'rgba(255,255,255,0.03)' } },
+                    y: { ticks: { color: '#8a8a8a' }, grid: { color: 'rgba(255,255,255,0.03)' } }
+                }
+            }
+        });
+
+        volumeChart = new Chart(volumeCanvas, {
+            type: 'bar',
+            data: {
+                labels: [],
+                datasets: [{ label: 'Actual Req/Hr', data: [], backgroundColor: 'rgba(54,249,174,0.5)', borderRadius: 4 }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: { ticks: { color: '#555' }, grid: { color: 'rgba(255,255,255,0.03)' } },
+                    y: { ticks: { color: '#8a8a8a' }, grid: { color: 'rgba(255,255,255,0.03)' } }
+                }
+            }
+        });
+    }
+
+    const historyPoints = [];
+
+    function pushHistory(point) {
+        historyPoints.push(point);
+        if (historyPoints.length > 12) historyPoints.shift();
+
+        if (compareChart) {
+            compareChart.data.labels = historyPoints.map((item) => item.timeLabel);
+            compareChart.data.datasets[0].data = historyPoints.map((item) => item.predicted);
+            compareChart.data.datasets[1].data = historyPoints.map((item) => item.actual);
+            compareChart.update();
+        }
+
+        if (volumeChart) {
+            volumeChart.data.labels = historyPoints.map((item) => item.timeLabel);
+            volumeChart.data.datasets[0].data = historyPoints.map((item) => item.actual);
+            volumeChart.update();
+        }
+
+        if (sampleBody) {
+            sampleBody.innerHTML = '';
+            [...historyPoints].reverse().forEach((item) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${item.timeStamp}</td>
+                    <td>${formatNumber(item.predicted)}</td>
+                    <td>${formatNumber(item.actual)}</td>
+                    <td>${item.deviationPct.toFixed(2)}%</td>
+                    <td><span class="badge ${item.statusClass}">${item.statusText}</span></td>
+                `;
+                sampleBody.appendChild(tr);
+            });
+        }
+    }
+
+    async function refreshLiveMetrics() {
+        const functionName = fnSelect.value;
+        if (!functionName) {
+            setBanner(hint, 'warn', 'Select a function to fetch live metrics.');
+            return;
+        }
+
+        setBanner(hint, 'loading', 'Fetching latest CloudWatch metrics...');
+
+        let response;
+        let mode = 'live';
+
+        try {
+            response = await apiRequest(`/live-metrics?${toQuery({
+                connectionId: session.connectionId,
+                functionName
+            })}`);
+        } catch (error) {
+            mode = 'demo';
+            const predicted = getStoredJson(GREENLAMBDA_KEYS.forecast)?.predictedReqPerHour || 200000;
+            response = createDemoLiveMetrics(predicted);
+            setBanner(hint, 'warn', `Backend unavailable (${error.message}). Showing demo live metrics.`);
+        }
+
+        const predicted = Number(response.predictedReqPerHour || response.predicted || 0);
+        const actual = Number(response.actualReqPerHour || response.actual || 0);
+        const deviationPct = Number(response.deviationPct || (((actual - predicted) / Math.max(predicted, 1)) * 100));
+
+        const statusText = Math.abs(deviationPct) <= 8 ? 'On Track' : 'Drifting';
+        const statusClass = Math.abs(deviationPct) <= 8 ? 'optimal' : 'warning';
+
+        document.getElementById('liveKpiPredicted').textContent = formatNumber(predicted);
+        document.getElementById('liveKpiActual').textContent = formatNumber(actual);
+        document.getElementById('liveKpiDeviation').textContent = `${deviationPct.toFixed(2)}%`;
+        document.getElementById('liveKpiStatus').textContent = statusText;
+        document.getElementById('liveLastUpdated').textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
+
+        const alerts = Array.isArray(response.alerts) ? response.alerts : [];
+        if (alerts.length) {
+            setBanner(alertBox, 'warn', alerts[0]);
+        } else {
+            setBanner(alertBox, 'ok', 'No critical deviation. Forecast is within safe limits.');
+        }
+
+        updateOptimizationAlerts(deviationPct, predicted, actual, fnSelect.value);
+
+        pushHistory({
+            predicted,
+            actual,
+            deviationPct,
+            statusText,
+            statusClass,
+            timeLabel: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            timeStamp: new Date().toLocaleString()
+        });
+
+        if (mode === 'live') {
+            setBanner(hint, 'ok', 'Live metrics updated successfully.');
+        }
+    }
+
+    function resetAutoRefresh() {
+        if (timer) {
+            clearInterval(timer);
+            timer = null;
+        }
+
+        if (autoToggle.value === 'on') {
+            const seconds = Number(refreshIntervalSelect.value || 60);
+            timer = setInterval(refreshLiveMetrics, seconds * 1000);
+        }
+    }
+
+    refreshNowBtn.addEventListener('click', refreshLiveMetrics);
+    fnSelect.addEventListener('change', refreshLiveMetrics);
+    refreshIntervalSelect.addEventListener('change', resetAutoRefresh);
+    autoToggle.addEventListener('change', resetAutoRefresh);
+
+    if (fnSelect.value) {
+        refreshLiveMetrics();
+    }
+    resetAutoRefresh();
+}
+
+/* --- Optimization Alerts Logic --- */
+function updateOptimizationAlerts(deviationPct, predicted, actual, functionName) {
+    const body = document.getElementById('optimizationAlertBody');
+    if (!body) return;
+    body.innerHTML = '';
+
+    const abs = Math.abs(deviationPct);
+    const isOver = actual > predicted;
+    const alerts = [];
+
+    if (abs <= 8) {
+        alerts.push({ type: 'opt-ok', msg: `✅ System Healthy: Actual traffic (${formatNumber(actual)} req/hr) is within 8% of forecast. No action needed.` });
+    } else if (abs > 8 && abs <= 20) {
+        alerts.push({ type: 'opt-warning', msg: `⚠️ Mild Drift Detected (${deviationPct.toFixed(1)}%): ${isOver ? 'Actual exceeds forecast.' : 'Traffic below forecast.'} Monitor closely for the next 30 minutes.` });
+        if (isOver) {
+            alerts.push({ type: 'opt-warning', msg: `💡 Suggestion: Consider enabling AWS Lambda Provisioned Concurrency on "${functionName}" to avoid cold-start latency spikes during elevated load.` });
+        } else {
+            alerts.push({ type: 'opt-warning', msg: `💡 Suggestion: Traffic is lower than predicted. Consider scaling down memory configuration to reduce idle compute cost.` });
+        }
+    } else if (abs > 20 && abs <= 40) {
+        alerts.push({ type: 'opt-danger', msg: `🔴 Significant Anomaly (${deviationPct.toFixed(1)}%): ${isOver ? 'Traffic dramatically exceeds forecast!' : 'Traffic severely under forecast.'}` });
+        if (isOver) {
+            alerts.push({ type: 'opt-danger', msg: `🚨 Action Required: Actual traffic is ${abs.toFixed(0)}% above prediction. Check for unexpected invocation bursts. Enable CloudWatch Alarms on "Throttles" and "ConcurrentExecutions".` });
+            alerts.push({ type: 'opt-warning', msg: `💡 Cost Advisory: At current deviation, estimated monthly cost may increase by ~₹${Math.round((abs / 100) * 2400)}. Consider setting Lambda reserved concurrency to cap runaway spend.` });
+        } else {
+            alerts.push({ type: 'opt-warning', msg: `💡 Efficiency Opportunity: Traffic is ${abs.toFixed(0)}% below forecast. Your Lambda may be over-provisioned. Reducing memory from current config could save ~₹${Math.round((abs / 100) * 1200)}/month.` });
+        }
+    } else {
+        alerts.push({ type: 'opt-danger', msg: `🚨 Critical Deviation (${deviationPct.toFixed(1)}%): Immediate attention required!` });
+        if (isOver) {
+            alerts.push({ type: 'opt-danger', msg: `⚡ Emergency: Traffic is ${abs.toFixed(0)}% above forecast — likely a traffic spike or DDoS. Consider enabling AWS Lambda throttling or WAF rules immediately.` });
+            alerts.push({ type: 'opt-danger', msg: `💸 Cost Alert: Uncontrolled burst at this deviation could cost an extra ₹${Math.round((abs / 100) * 6000)}+/month. Enable AWS Budgets alert threshold at 80%.` });
+        } else {
+            alerts.push({ type: 'opt-danger', msg: `📉 Dead Traffic: Actual is ${abs.toFixed(0)}% below forecast. Check if your Lambda trigger (API Gateway, SQS, etc.) is misconfigured or inactive.` });
+        }
+    }
+
+    alerts.forEach(({ type, msg }) => {
+        const div = document.createElement('div');
+        div.className = `opt-alert ${type}`;
+        div.innerHTML = `<span>${msg}</span>`;
+        body.appendChild(div);
+    });
+}
+
+/* --- Login Page Logic --- */
+function initLoginPage() {
+    const authToggle = document.getElementById('authToggle');
+    const flipCardInner = document.getElementById('flipCardInner');
+    const labelLogin = document.getElementById('labelLogin');
+    const labelSignup = document.getElementById('labelSignup');
+
+    if (authToggle) {
+        authToggle.addEventListener('change', (e) => {
+            if (e.target.checked) {
+                // Switching to Sign up
+                flipCardInner.classList.add('flipped');
+                labelLogin.classList.remove('active');
+                labelSignup.classList.add('active');
+            } else {
+                // Switching to Log in
+                flipCardInner.classList.remove('flipped');
+                labelSignup.classList.remove('active');
+                labelLogin.classList.add('active');
+            }
+        });
+
+        labelLogin.addEventListener('click', () => {
+            if (authToggle.checked) {
+                authToggle.checked = false;
+                authToggle.dispatchEvent(new Event('change'));
+            }
+        });
+        labelSignup.addEventListener('click', () => {
+            if (!authToggle.checked) {
+                authToggle.checked = true;
+                authToggle.dispatchEvent(new Event('change'));
+            }
+        });
+    }
+
+    const loginForm = document.getElementById('loginForm');
+    const signupForm = document.getElementById('signupForm');
+    const loginStatus = document.getElementById('loginStatus');
+    const signupStatus = document.getElementById('signupStatus');
+
+    if (signupForm) {
+        signupForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('signupEmail').value;
+            const password = document.getElementById('signupPassword').value;
+            const btn = document.getElementById('signupSubmitBtn');
+
+            signupStatus.textContent = 'Creating account...';
+            signupStatus.className = 'fc-status loading';
+            btn.disabled = true;
+
+            const { data, error } = await supabase.auth.signUp({
+                email: email,
+                password: password,
+            });
+
+            if (error) {
+                signupStatus.textContent = error.message;
+                signupStatus.className = 'fc-status error';
+                btn.disabled = false;
+            } else {
+                signupStatus.textContent = 'Account created successfully!';
+                signupStatus.className = 'fc-status ok';
+                signupForm.reset();
+                setTimeout(() => {
+                    authToggle.checked = false;
+                    authToggle.dispatchEvent(new Event('change'));
+                    btn.disabled = false;
+                    signupStatus.textContent = '';
+                }, 1500);
+            }
+        });
+    }
+
+    if (loginForm) {
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+            const btn = document.getElementById('loginSubmitBtn');
+
+            loginStatus.textContent = 'Logging in...';
+            loginStatus.className = 'fc-status loading';
+            btn.disabled = true;
+
+            const { data, error } = await supabase.auth.signInWithPassword({
+                email: email,
+                password: password,
+            });
+
+            if (error) {
+                loginStatus.textContent = error.message;
+                loginStatus.className = 'fc-status error';
+                btn.disabled = false;
+            } else {
+                loginStatus.textContent = 'Logged in successfully!';
+                loginStatus.className = 'fc-status ok';
+                setTimeout(() => {
+                    window.location.href = 'index.html'; // Redirect to home
+                }, 1000);
+            }
+        });
+    }
 }

@@ -15,7 +15,7 @@
     <link rel="stylesheet" href="style.css">
 </head>
 
-<body>
+<body data-page="home">
     <div class="ic-loader-wrapper" id="loader">
         <div class="ic-loader-animation"></div>
     </div>
@@ -94,7 +94,7 @@
                         stroke-linejoin="round">
                         <polyline points="16 18 22 12 16 6"></polyline>
                         <polyline points="8 6 2 12 8 18"></polyline>
-                    </svg> Code
+                    </svg> Connect AWS
                 </a>
                 <a href="#contact" class="nav-link" data-section="contact">
                     <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"
@@ -105,9 +105,23 @@
                     </svg> Contact
                 </a>
             </div>
-            <button class="nav-toggle" id="navToggle" aria-label="Toggle menu">
-                <span></span><span></span><span></span>
-            </button>
+            <div class="nav-actions" style="display: flex; align-items: center; gap: 0.8rem;">
+                <a href="login.html" class="btn btn-primary" style="padding:0.45rem 1.1rem;font-size:0.82rem;">
+                    <span class="fold"></span>
+                    <div class="points_wrapper"><i class="point"></i><i class="point"></i><i class="point"></i><i
+                            class="point"></i><i class="point"></i></div>
+                    <span class="inner" style="gap:0.4rem;">
+                        <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                            xmlns="http://www.w3.org/2000/svg" stroke-linecap="round" stroke-linejoin="round"
+                            stroke-width="2.5" style="width:14px;height:14px;">
+                            <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3" />
+                        </svg> Get Started
+                    </span>
+                </a>
+                <button class="nav-toggle" id="navToggle" aria-label="Toggle menu">
+                    <span></span><span></span><span></span>
+                </button>
+            </div>
         </div>
     </nav>
 
@@ -187,13 +201,13 @@
                 <div class="split-right">
                     <p class="section-text reveal">
                         Serverless computing has become a dominant cloud paradigm due to its scalability
-                        and ease of deployment. However, current profiling tools focus on execution time,
-                        latency, and monetary cost — while energy consumption remains entirely opaque.
+                        and ease of deployment. However, current profiling tools focus heavily on simple execution time
+                        and latency — while true energy consumption remains entirely opaque.
                     </p>
                     <p class="section-text reveal">
-                        As cloud infrastructures scale, the cumulative energy footprint of serverless
-                        functions contributes significantly to operational costs and environmental impact.
-                        Developers lack mechanisms to estimate energy usage before deployment.
+                        Green Lambda bridges this gap by merging static code attributes with dynamic cloud metrics. 
+                        We pass this unified profile directly into Machine Learning models to accurately predict energy footprints 
+                        and simulate high-traffic demand spikes explicitly before any code reaches production.
                     </p>
                     <div class="stat-row reveal">
                         <div class="stat-item">
@@ -233,11 +247,10 @@
                             <line x1="10" y1="9" x2="8" y2="9" />
                         </svg>
                     </div>
-                    <h3>Static Code Analysis</h3>
-                    <p>Extracting complexity, I/O calls, memory usage hints, and structural patterns directly from
-                        function source code.</p>
-                    <button class="pillar-link discover-btn" data-title="Static Code Analysis"
-                        data-content="Our deep-inspection engine processes serverless functions directly at the AST (Abstract Syntax Tree) level before runtime. <br><br><b>Key Metrics Extracted:</b><ul style='margin-top:10px; padding-left:20px; color:var(--accent);'><li style='margin-bottom:8px;'><span style='color:white;'><b>Cyclomatic Complexity:</b> Identifying deeply nested loops and heavy branching that block execution speed.</span></li><li style='margin-bottom:8px;'><span style='color:white;'><b>I/O Wait Times:</b> Locating synchronous DB queries and external API calls that hold CPU states idle.</span></li><li style='margin-bottom:8px;'><span style='color:white;'><b>Memory Allocation Patterns:</b> Predicting garbage-collection strain from heavy object arrays.</span></li></ul><br>By identifying these critical code smells, Green Lambda formulates an accurate baseline of CPU cycles required per invocation, which sets the foundation for our raw energy tracking.">Discover
+                    <h3>Feature Extraction</h3>
+                    <p>Mining static attributes (cyclomatic complexity, nesting depth) alongside dynamic AWS metrics (memory limits, cold starts).</p>
+                    <button class="pillar-link discover-btn" data-title="Feature Extraction"
+                        data-content="Our deep-inspection engine automatically parses serverless footprints locally.<br><br><b>Key Metrics Extracted:</b><ul style='margin-top:10px; padding-left:20px; color:var(--accent);'><li style='margin-bottom:8px;'><span style='color:white;'><b>Static Code Properties:</b> Tracing cyclomatic complexity, lines of code, and deep network nesting depths.</span></li><li style='margin-bottom:8px;'><span style='color:white;'><b>Dynamic Cloud Metrics:</b> Tracking cloud environment constraints like memory configuration limits and cold starts.</span></li></ul><br>By merging precise code logic with simulated execution constraints, Green Lambda maps the true footprint variables of your platform.">Discover
                         More &rarr;</button>
                 </div>
                 <div class="pillar-card reveal" data-index="02">
@@ -248,11 +261,10 @@
                             <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
                         </svg>
                     </div>
-                    <h3>Dynamic Execution Patterns</h3>
-                    <p>Learning from invocation frequency, runtime behavior, cold start overhead, and historical
-                        execution traces.</p>
-                    <button class="pillar-link discover-btn" data-title="Dynamic Execution Patterns"
-                        data-content="Static code is only half the equation. Serverless functions run in highly dynamic, unpredictable environments. <br><br><b>Runtime Factors Evaluated:</b><ul style='margin-top:10px; padding-left:20px; color:var(--accent);'><li style='margin-bottom:8px;'><span style='color:white;'><b>Cold Start Frequencies:</b> Modeling VM spin-up times and container initialization overhead.</span></li><li style='margin-bottom:8px;'><span style='color:white;'><b>Provisioning Impacts:</b> Analyzing the energy curve difference between 128MB vs 2048MB runtime allocations.</span></li><li style='margin-bottom:8px;'><span style='color:white;'><b>Concurrency Spikes:</b> Tracking energy loss due to heavy traffic burst thresholds and CPU throttling.</span></li></ul><br>By mapping historical invocation patterns against live cloud data, we can accurately project the compounding energy penalty incurred during high-traffic execution phases.">Discover
+                    <h3>ML Prediction Engine</h3>
+                    <p>Feeding unified metrics into trained ML algorithms (XGBoost, Random Forest, Neural Networks) to accurately forecast energy usage.</p>
+                    <button class="pillar-link discover-btn" data-title="ML Prediction Engine"
+                        data-content="At the core of Green Lambda lies a robust machine learning ensemble built explicitly for serverless environments.<br><br><b>Model Capabilities:</b><ul style='margin-top:10px; padding-left:20px; color:var(--accent);'><li style='margin-bottom:8px;'><span style='color:white;'><b>Advanced Ensembles:</b> Operating heavily on optimized Gradient Boosting (XGBoost), Random Forest, and Deep Neural Networks.</span></li><li style='margin-bottom:8px;'><span style='color:white;'><b>Pre-Deployment Output:</b> Instantly spitting out energy predictions measured strictly in Watt-Hours (Wh) per invocation far before you hit 'Deploy' to AWS.</span></li></ul>">Discover
                         More &rarr;</button>
                 </div>
                 <div class="pillar-card reveal" data-index="03">
@@ -263,11 +275,10 @@
                             <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
                         </svg>
                     </div>
-                    <h3>Energy Prediction Engine</h3>
-                    <p>ML models that estimate energy cost per invocation — enabling optimization before any function
-                        goes live.</p>
-                    <button class="pillar-link discover-btn" data-title="Energy Prediction Engine"
-                        data-content="At the core of Green Lambda lies a robust machine learning ensemble trained on tens of thousands of real-world serverless traces.<br><br><b>Model Capabilities:</b><ul style='margin-top:10px; padding-left:20px; color:var(--accent);'><li style='margin-bottom:8px;'><span style='color:white;'><b>Feature Synthesis:</b> Merging static AST metrics and dynamic runtime constraints into a unified tensor.</span></li><li style='margin-bottom:8px;'><span style='color:white;'><b>Regression Accuracies:</b> Operating on highly optimized Gradient Boosting (XGBoost) and Neural Net algorithms to achieve 94% R² scoring.</span></li><li style='margin-bottom:8px;'><span style='color:white;'><b>Pre-Deployment Output:</b> Spitting out energy predictions measured strictly in Watt-Hours (Wh) before code hits production.</span></li></ul><br>This allows dev teams to securely benchmark, experiment, and precisely tune performance-per-watt across different architectural iterations locally.">Discover
+                    <h3>SHAP Interpretability</h3>
+                    <p>Breaking open the ML black box to mathematically prove exactly which config components secretly drive up your application's energy costs.</p>
+                    <button class="pillar-link discover-btn" data-title="SHAP Interpretability"
+                        data-content="Prediction data is useless without knowing exactly why it's so high. Green Lambda natively deploys SHAP (SHapley Additive exPlanations) to maintain strict model transparency.<br><br><b>The Insights:</b><ul style='margin-top:10px; padding-left:20px; color:var(--accent);'><li style='margin-bottom:8px;'><span style='color:white;'><b>Root Cause Tracking:</b> Instantly quantifies whether your energy overhead is strictly driven by your excessive memory allocation sizes, function typing, or runtime limits.</span></li><li style='margin-bottom:8px;'><span style='color:white;'><b>Smarter Iteration:</b> Proves exactly which variables a developer must tweak locally to radically drive down cloud emissions upon scale.</span></li></ul>">Discover
                         More &rarr;</button>
                 </div>
                 <div class="pillar-card reveal" data-index="04">
@@ -280,11 +291,10 @@
                             <path d="M6 20v-4" />
                         </svg>
                     </div>
-                    <h3>Sustainability Insights</h3>
-                    <p>Feature importance analysis and actionable optimization hints that promote sustainable cloud
-                        computing practices.</p>
-                    <button class="pillar-link discover-btn" data-title="Sustainability Insights"
-                        data-content="Prediction data is useless without explicit action. Our platform doesn't just grade your energy consumption—it actively guides you on how to minimize it.<br><br><b>Actionable Workflows:</b><ul style='margin-top:10px; padding-left:20px; color:var(--accent);'><li style='margin-bottom:8px;'><span style='color:white;'><b>Architecture Profiling:</b> Visually graphing the most absolute energy-intensive slices of your application logic.</span></li><li style='margin-bottom:8px;'><span style='color:white;'><b>Refactoring Directives:</b> Providing hints on how to swap heavy standard libraries or optimize API payloads to shed cycle times.</span></li><li style='margin-bottom:8px;'><span style='color:white;'><b>Resource Tuning:</b> Assisting in scaling memory provisioning down mathematically to achieve dramatic reductions in cloud carbon footprints.</span></li></ul>">Discover
+                    <h3>Demand Simulation</h3>
+                    <p>Artificially simulating high-traffic AWS spikes to aggressively project real-time cloud carbon emissions and exact INR billing costs.</p>
+                    <button class="pillar-link discover-btn" data-title="Demand Simulation"
+                        data-content="Predicting 1 single invocation isn't enough to prevent large climate impacts. Serverless models scale wildly against traffic.<br><br><b>Simulation Engine:</b><ul style='margin-top:10px; padding-left:20px; color:var(--accent);'><li style='margin-bottom:8px;'><span style='color:white;'><b>Traffic Spikes:</b> Developers can actively multiply their predicted baseline load and stress-test over sustained 72-hour burst simulations.</span></li><li style='margin-bottom:8px;'><span style='color:white;'><b>Financial & Carbon Forecasting:</b> Dynamically translates those precise Wh metrics directly into Indian Rupees (INR) cloud billing damages and precise Kg CO₂ emissions based on local energy grids.</span></li></ul>">Discover
                         More &rarr;</button>
                 </div>
             </div>
@@ -298,40 +308,36 @@
                 From Code to <em>Carbon</em>
             </h2>
             <p class="section-subtitle reveal">
-                Our approach combines static analysis, execution profiling, and ML prediction
-                in a four-phase discipline to deliver pre-deployment energy estimates.
+                Our framework fuses static software properties with dynamic cloud metrics, passing them through
+                accurate ML models and traffic simulators to deliver real-time pre-deployment carbon & cost forecasting.
             </p>
             <div class="framework-steps">
                 <div class="fw-step reveal">
                     <div class="fw-step-num">01</div>
                     <div class="fw-step-content">
-                        <h3>Extract</h3>
-                        <p>Parse serverless function code to extract static features — cyclomatic complexity, I/O
-                            operations, memory allocation patterns, loop depth, and external API calls.</p>
+                        <h3>Extract Features</h3>
+                        <p>Automatically extract both static application logic (cyclomatic complexity, lines of code, nesting depth) alongside critical dynamic cloud execution metrics (memory configuration, cold starts).</p>
                     </div>
                 </div>
                 <div class="fw-step reveal">
                     <div class="fw-step-num">02</div>
                     <div class="fw-step-content">
-                        <h3>Profile</h3>
-                        <p>Collect historical execution data — invocation frequency, runtime duration, cold start
-                            overhead, CPU/memory utilization, and network throughput as dynamic features.</p>
+                        <h3>ML Predictions</h3>
+                        <p>Pass these unified feature sets into our trained Machine Learning models (XGBoost, Random Forest, Neural Networks) to instantly capture the energy consumption in Watt-Hours (Wh) per invocation.</p>
                     </div>
                 </div>
                 <div class="fw-step reveal">
                     <div class="fw-step-num">03</div>
                     <div class="fw-step-content">
-                        <h3>Predict</h3>
-                        <p>Feed combined feature vectors into trained ML models (XGBoost, Random Forest, Neural Network)
-                            to predict energy consumption in Wh per invocation.</p>
+                        <h3>SHAP Insights</h3>
+                        <p>Deploy SHAP analysis to break open the black box, mathematically proving the exact components (like excessive memory allocation limits) that are secretly driving your application's energy overhead.</p>
                     </div>
                 </div>
                 <div class="fw-step reveal">
                     <div class="fw-step-num">04</div>
                     <div class="fw-step-content">
-                        <h3>Optimize</h3>
-                        <p>Generate actionable insights — SHAP-based feature importance, code pattern analysis, and
-                            concrete optimization recommendations to reduce energy footprint.</p>
+                        <h3>Demand Simulation</h3>
+                        <p>Forecast the long-term reality by artificially simulating high-traffic AWS demand spikes against the ML models, projecting exact carbon emissions and precise INR billing impacts before go-live.</p>
                     </div>
                 </div>
             </div>
@@ -340,10 +346,16 @@
 
     <section class="section section-dashboard" id="dashboard">
         <div class="container">
-            <span class="section-label reveal">04 — Live Dashboard</span>
+            <span class="section-label reveal">04 — ML Proof of Accuracy</span>
             <h2 class="section-title reveal">
-                Intelligence at <em>a Glance</em>
+                How Good Is the <em>Model?</em>
             </h2>
+            <p class="section-subtitle reveal" style="max-width:700px;margin-bottom:2rem;">
+                This interactive demo shows what Green Lambda's ML engine outputs. The charts and metrics below
+                represent
+                real model performance — R² scores, SHAP feature importance, and energy distribution — all computed
+                from our training dataset. Connect your AWS account to see your own functions here.
+            </p>
 
             <div class="kpi-row reveal">
                 <div class="kpi-card">
@@ -413,7 +425,7 @@
                                 <div class="metric-fill green" id="netBar" data-base="23" data-var="20"></div>
                             </div><span class="metric-val" id="netVal">23%</span>
                         </div>
-                        <div class="metric-row"><span>Disk I/O</span>
+                        <div class="metric-row"><span>Function Calls</span>
                             <div class="metric-bar">
                                 <div class="metric-fill amber" id="diskBar" data-base="31" data-var="12"></div>
                             </div><span class="metric-val" id="diskVal">31%</span>
@@ -472,10 +484,10 @@
                     <div class="model-icon-wrap rf">RF</div>
                     <h3>Random Forest</h3>
                     <div class="model-stats">
-                        <div><span class="ms-label">R²</span><span class="ms-val">0.912</span></div>
-                        <div><span class="ms-label">MAE</span><span class="ms-val">0.043</span></div>
-                        <div><span class="ms-label">RMSE</span><span class="ms-val">0.067</span></div>
-                        <div><span class="ms-label">Train</span><span class="ms-val">2.1s</span></div>
+                        <div><span class="ms-label">R²</span><span class="ms-val">0.999</span></div>
+                        <div><span class="ms-label">MAE</span><span class="ms-val">0.0019</span></div>
+                        <div><span class="ms-label">RMSE</span><span class="ms-val">0.0062</span></div>
+                        <div><span class="ms-label">Train</span><span class="ms-val">0.20s</span></div>
                     </div>
                 </div>
                 <div class="model-card active-model reveal" data-active="true">
@@ -483,10 +495,10 @@
                     <div class="model-icon-wrap xgb">XG</div>
                     <h3>XGBoost</h3>
                     <div class="model-stats">
-                        <div><span class="ms-label">R²</span><span class="ms-val">0.943</span></div>
-                        <div><span class="ms-label">MAE</span><span class="ms-val">0.031</span></div>
-                        <div><span class="ms-label">RMSE</span><span class="ms-val">0.048</span></div>
-                        <div><span class="ms-label">Train</span><span class="ms-val">4.7s</span></div>
+                        <div><span class="ms-label">R²</span><span class="ms-val">0.999</span></div>
+                        <div><span class="ms-label">MAE</span><span class="ms-val">0.0011</span></div>
+                        <div><span class="ms-label">RMSE</span><span class="ms-val">0.0115</span></div>
+                        <div><span class="ms-label">Train</span><span class="ms-val">0.26s</span></div>
                     </div>
                 </div>
                 <div class="model-card reveal" data-active="false">
@@ -494,21 +506,10 @@
                     <div class="model-icon-wrap nn">NN</div>
                     <h3>Neural Network</h3>
                     <div class="model-stats">
-                        <div><span class="ms-label">R²</span><span class="ms-val">0.938</span></div>
-                        <div><span class="ms-label">MAE</span><span class="ms-val">0.035</span></div>
-                        <div><span class="ms-label">RMSE</span><span class="ms-val">0.052</span></div>
-                        <div><span class="ms-label">Train</span><span class="ms-val">18.3s</span></div>
-                    </div>
-                </div>
-                <div class="model-card reveal" data-active="false">
-                    <div class="model-badge">Support Vector</div>
-                    <div class="model-icon-wrap svr">SV</div>
-                    <h3>SVR</h3>
-                    <div class="model-stats">
-                        <div><span class="ms-label">R²</span><span class="ms-val">0.887</span></div>
-                        <div><span class="ms-label">MAE</span><span class="ms-val">0.052</span></div>
-                        <div><span class="ms-label">RMSE</span><span class="ms-val">0.078</span></div>
-                        <div><span class="ms-label">Train</span><span class="ms-val">1.4s</span></div>
+                        <div><span class="ms-label">R²</span><span class="ms-val">0.997</span></div>
+                        <div><span class="ms-label">MAE</span><span class="ms-val">0.0288</span></div>
+                        <div><span class="ms-label">RMSE</span><span class="ms-val">0.0706</span></div>
+                        <div><span class="ms-label">Train</span><span class="ms-val">0.21s</span></div>
                     </div>
                 </div>
             </div>
@@ -537,24 +538,21 @@
                 Making Developers<br>the <em>Heroes</em>
             </h2>
             <p class="section-subtitle reveal">
-                We empower stakeholders to build energy-efficient serverless architectures —
-                turning sustainability goals into measurable progress.
+                We empower stakeholders to actively combat extreme serverless energy creep —
+                turning ML predictions into scalable sustainability.
             </p>
             <div class="partners-grid">
                 <div class="partner-card reveal">
                     <h3>Developers</h3>
-                    <p>We provide pre-deployment energy estimates and code-level optimization hints — enabling
-                        energy-aware design choices before functions go live.</p>
+                    <p>Forecast exact Watt-Hours for local functions and simulate cloud spikes natively, empowering developers to fix carbon-heavy flaws before ever pushing their code to AWS.</p>
                 </div>
                 <div class="partner-card reveal">
                     <h3>DevOps Teams</h3>
-                    <p>We integrate energy metrics into CI/CD pipelines — achieving energy budgets through automated
-                        profiling and continuous monitoring.</p>
+                    <p>Provide real-time transparency into how individual memory limit configurations realistically scale into massive INR billing costs and grid carbon emissions during huge traffic bursts.</p>
                 </div>
                 <div class="partner-card reveal">
                     <h3>Cloud Architects</h3>
-                    <p>We surface infrastructure-level patterns — ensuring each architectural decision delivers
-                        measurable energy and cost efficiency.</p>
+                    <p>Use SHAP to break the ML black box, allowing true leaders to quantitatively prove exactly what specific forces dictate serverless sustainability profiles.</p>
                 </div>
             </div>
         </div>
@@ -564,15 +562,14 @@
         <div class="container" style="text-align: center;">
             <span class="section-label reveal">06 — Take Action</span>
             <h2 class="section-title reveal">
-                Analyze Your <em>Functions</em>
+                Connect Once, <em>Predict Automatically</em>
             </h2>
             <p class="section-subtitle reveal" style="max-width: 600px; margin: 0 auto 3rem auto;">
-                Stop guessing your cloud carbon footprint. Paste your raw serverless function code directly into our ML
-                analysis engine to instantly predict energy consumption in Wh, profiling breakdowns, and targeted
-                refactoring optimizations.
+                Connect your AWS account once and Green Lambda will auto-discover Lambda functions, run ML energy
+                predictions, simulate demand spikes, and track predicted vs actual metrics live.
             </p>
             <div class="cta-row reveal" style="justify-content: center;">
-                <a href="analyze.html" class="btn btn-primary btn-lg" style="font-size: 1rem; padding: 1.2rem 3rem;">
+                <a href="connect.html" class="btn btn-primary btn-lg" style="font-size: 1rem; padding: 1.2rem 3rem;">
                     <span class="fold"></span>
                     <div class="points_wrapper">
                         <i class="point"></i><i class="point"></i><i class="point"></i><i class="point"></i><i
@@ -586,7 +583,7 @@
                             stroke-width="2.5">
                             <polyline points="16 18 22 12 16 6"></polyline>
                             <polyline points="8 6 2 12 8 18"></polyline>
-                        </svg> Try Code Analysis Tool
+                        </svg> Connect AWS Account
                     </span>
                 </a>
             </div>
@@ -656,6 +653,9 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/simplex-noise/2.4.0/simplex-noise.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+    <!-- Supabase Logic -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabaseClient.js"></script>
     <script src="script.js"></script>
     <script>
         window.addEventListener('load', () => {

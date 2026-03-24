@@ -1,4 +1,4 @@
-﻿/* =============================================
+/* =============================================
    Green Lambda â€” Infracorp-Inspired Design System
    Dark monochrome, large type, scroll reveals
    ============================================= */
@@ -153,7 +153,7 @@ body {
     left: 50%;
     transform: translateX(-50%);
     width: 98%;
-    max-width: 1250px;
+    max-width: 1450px;
     height: 64px;
     background: rgba(15, 15, 15, 0.5);
     backdrop-filter: blur(20px);
@@ -175,7 +175,7 @@ body {
 }
 
 .nav.scrolled .nav-inner {
-    padding: 0 1.5rem;
+    padding: 0 1.2rem;
 }
 
 .nav-logo {
@@ -187,7 +187,7 @@ body {
 }
 
 .logo-mark {
-    font-size: 1.3rem;
+    font-size: 1.2rem;
     filter: drop-shadow(0 0 8px rgba(200, 255, 0, 0.4));
 }
 
@@ -221,9 +221,9 @@ body {
     position: relative;
     text-decoration: none;
     color: var(--text-2);
-    font-size: 0.8rem;
+    font-size: 0.76rem;
     font-weight: 600;
-    padding: 0.5rem 0.9rem;
+    padding: 0.45rem 0.65rem;
     letter-spacing: 0.02em;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     border-radius: 100px;
@@ -247,9 +247,9 @@ body {
 }
 
 .nav-link .nav-icon {
-    width: 16px;
-    height: 16px;
-    margin-right: 6px;
+    width: 14px;
+    height: 14px;
+    margin-right: 4px;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     transform-origin: center center;
     transform-box: fill-box;
@@ -260,7 +260,9 @@ body {
     animation: navIconDraw 0.5s linear forwards;
 }
 
-.nav-link[href="#hero"]:hover .nav-icon {
+.nav-link[href="#hero"]:hover .nav-icon,
+.nav-link[data-section="home"]:hover .nav-icon,
+.nav-link[data-section="hero"]:hover .nav-icon {
     animation: navIconDraw 0.5s linear forwards, navBounce 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
 }
 
@@ -276,7 +278,8 @@ body {
     animation: navIconDraw 0.5s linear forwards, navPulseStroke 0.6s ease-in-out infinite alternate;
 }
 
-.nav-link[href="#dashboard"]:hover .nav-icon {
+.nav-link[href="#dashboard"]:hover .nav-icon,
+.nav-link[data-section="dashboard"]:hover .nav-icon {
     animation: navIconDraw 0.5s linear forwards, diagonalShift 0.8s ease infinite alternate;
 }
 
@@ -288,8 +291,20 @@ body {
     animation: navIconDraw 0.5s linear forwards, navPulseStroke 0.6s ease-in-out infinite alternate;
 }
 
-.nav-link[href="#analyze"]:hover .nav-icon {
-    animation: navIconDraw 0.5s linear forwards, navShake 0.4s ease-in-out forwards;
+.nav-link[href="#analyze"]:hover .nav-icon,
+.nav-link[data-section="analyze"]:hover .nav-icon,
+.nav-link[data-section="connect"]:hover .nav-icon {
+    animation: navIconDraw 0.5s linear forwards, connectActiveNav 0.8s ease-in-out infinite alternate forwards;
+}
+
+@keyframes connectActiveNav {
+    0% {
+        transform: translateY(-2px) scale(1.15);
+    }
+
+    100% {
+        transform: translateY(-4px) scale(1.25);
+    }
 }
 
 .nav-link[href="#contact"]:hover .nav-icon {
@@ -718,6 +733,46 @@ body {
 .analyze-btn-wrap .btn:hover svg.icon,
 .editor-footer .btn:hover svg.icon {
     animation: dasharray 1s linear forwards, filledPrimary 0.1s linear forwards 0.95s, navPulseStroke 1s ease-in-out infinite alternate 1s;
+}
+
+/* Connect AWS Button -> Rotate and Pulse */
+.btn[href="connect.html"]:hover svg.icon,
+#connectAwsBtn:hover svg.icon {
+    animation: dasharray 1s linear forwards, filledPrimary 0.1s linear forwards 0.95s, connectActive 1.5s ease-in-out infinite alternate 1s;
+}
+
+/* Run Function Prediction & Refresh Live Metrics */
+#runAnalyzeBtn:hover svg.icon,
+#liveRefreshNowBtn:hover svg.icon {
+    animation: dasharray 1s linear forwards, filledPrimary 0.1s linear forwards 0.95s, navSpin 1.5s ease-in-out infinite 1s;
+}
+
+/* Generate Spike Forecast */
+#predictSpikeBtn:hover svg.icon {
+    animation: dasharray 1s linear forwards, filledPrimary 0.1s linear forwards 0.95s, bouncePulse 1.2s ease-in-out infinite 1s;
+}
+
+/* Continue to Function / Open Dashboard (Ghost Buttons) */
+#gotoAnalyzeBtn:hover svg.icon,
+#gotoDashboardBtn:hover svg.icon {
+    animation: dasharray 1s linear forwards, filledGhost 0.1s linear forwards 0.95s, diagonalShift 0.8s ease infinite alternate 1s;
+}
+
+/* Get Started Button */
+.btn[href="login.html"]:hover svg.icon {
+    animation: dasharray 1s linear forwards, filledPrimary 0.1s linear forwards 0.95s, navBounce 0.8s ease-in-out infinite alternate 1s;
+}
+
+@keyframes connectActive {
+    0% {
+        transform: scale(1.1) translateY(-2px);
+        filter: drop-shadow(0 0 4px var(--bg));
+    }
+
+    100% {
+        transform: scale(1.25) translateY(-4px);
+        filter: drop-shadow(0 0 8px var(--bg));
+    }
 }
 
 @keyframes dasharray {
@@ -1590,7 +1645,7 @@ body {
 
 .model-grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(3, 1fr);
     gap: 1.5rem;
     margin-top: 3rem;
 }
@@ -1661,11 +1716,6 @@ body {
 .model-icon-wrap.nn {
     background: rgba(123, 97, 255, 0.1);
     color: var(--purple);
-}
-
-.model-icon-wrap.svr {
-    background: rgba(255, 194, 51, 0.1);
-    color: var(--amber);
 }
 
 .model-card h3 {
@@ -3124,21 +3174,6 @@ body {
     border-color: rgba(200, 255, 0, 0.2);
 }
 
-#monaco-editor {
-    width: 100%;
-    height: 500px;
-    margin-top: 1rem;
-    border-radius: 8px;
-    overflow: hidden;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.5);
-    transition: border-color 0.3s;
-}
-
-#monaco-editor:hover {
-    border-color: rgba(200, 255, 0, 0.3);
-}
-
 .metadata-panel {
     background: rgba(20, 20, 20, 0.4);
     backdrop-filter: blur(20px);
@@ -3187,6 +3222,7 @@ body {
 
 .form-range {
     -webkit-appearance: none;
+    appearance: none;
     width: 100%;
     height: 6px;
     background: rgba(255, 255, 255, 0.1);
@@ -4417,4 +4453,192 @@ input:checked+.slider:before {
 .radio-input:has(#value-2:checked) #trigger-for-2,
 .radio-input:has(#value-3:checked) #trigger-for-3 {
     z-index: 100;
+}
+
+/* ===== WORKFLOW PAGES (CONNECT / ANALYZE / DASHBOARD) ===== */
+.workflow-main {
+    min-height: calc(100vh - var(--nav-h));
+    padding-top: 120px;
+    padding-bottom: 48px;
+}
+
+.workflow-shell {
+    background: rgba(20, 20, 20, 0.45);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: var(--radius);
+    padding: 2rem;
+    box-shadow: 0 20px 45px rgba(0, 0, 0, 0.35);
+}
+
+.workflow-form {
+    margin-top: 1rem;
+}
+
+.form-grid-2 {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.form-grid-3 {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.workflow-actions {
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    gap: 0.75rem;
+    margin-top: 1rem;
+}
+
+.status-banner {
+    display: none;
+    margin-top: 1rem;
+    padding: 0.9rem 1rem;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    font-size: 0.85rem;
+    color: var(--text-2);
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.status-banner.show {
+    display: block;
+}
+
+.status-banner.ok {
+    color: var(--green);
+    border-color: rgba(54, 249, 174, 0.35);
+    background: rgba(54, 249, 174, 0.08);
+}
+
+.status-banner.warn {
+    color: var(--amber);
+    border-color: rgba(255, 194, 51, 0.35);
+    background: rgba(255, 194, 51, 0.08);
+}
+
+.status-banner.error {
+    color: var(--red);
+    border-color: rgba(255, 61, 113, 0.35);
+    background: rgba(255, 61, 113, 0.08);
+}
+
+.status-banner.loading {
+    color: var(--accent);
+    border-color: rgba(200, 255, 0, 0.35);
+    background: rgba(200, 255, 0, 0.08);
+}
+
+.connected-functions {
+    margin-top: 1.5rem;
+}
+
+.function-list {
+    display: grid;
+    gap: 0.75rem;
+    margin-top: 1rem;
+}
+
+.function-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.8rem 1rem;
+    border-radius: 10px;
+    background: rgba(13, 13, 13, 0.8);
+    border: 1px solid var(--border);
+}
+
+.function-item-name {
+    color: var(--text);
+    font-weight: 600;
+}
+
+.function-item-meta {
+    color: var(--text-2);
+    font-family: var(--mono);
+    font-size: 0.75rem;
+}
+
+.chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.results-dashboard[hidden] {
+    display: none !important;
+}
+
+@media (max-width: 920px) {
+
+    .form-grid-2,
+    .form-grid-3 {
+        grid-template-columns: 1fr;
+    }
+
+    .workflow-shell {
+        padding: 1.3rem;
+    }
+
+    .workflow-actions .btn {
+        width: 100%;
+        justify-content: center;
+    }
+}
+
+/* ── Optimization Alert Cards (dashboard.html) ── */
+.opt-alert {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.85rem 1rem;
+    border-radius: 10px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    line-height: 1.5;
+    border: 1px solid transparent;
+    animation: fadeSlideIn 0.4s ease forwards;
+}
+
+.opt-alert.opt-warning {
+    background: rgba(255, 170, 0, 0.08);
+    border-color: rgba(255, 170, 0, 0.25);
+    color: #ffaa00;
+}
+
+.opt-alert.opt-danger {
+    background: rgba(255, 61, 113, 0.08);
+    border-color: rgba(255, 61, 113, 0.3);
+    color: #ff3d71;
+}
+
+.opt-alert.opt-ok {
+    background: rgba(54, 249, 174, 0.07);
+    border-color: rgba(54, 249, 174, 0.2);
+    color: #36f9ae;
+}
+
+.opt-alert.opt-neutral {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.08);
+    color: var(--text-2);
+}
+
+@keyframes fadeSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(6px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }

@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Connect AWS | Green Lambda</title>
+    <meta name="description" content="Connect your AWS account to auto-discover Lambda functions for Green Lambda predictions.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@300;400;500;600&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body data-page="connect">
+    <nav class="nav" id="nav">
+        <div class="nav-inner">
+            <a href="index.html" class="nav-logo">
+                <span class="logo-mark">⚡</span>
+                <span class="logo-text">Green Lambda</span>
+            </a>
+            <div class="nav-links" id="navLinks">
+                <a href="index.html" class="nav-link" data-section="home">
+                    <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                        xmlns="http://www.w3.org/2000/svg" stroke-width="2.5" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                    </svg> Home
+                </a>
+                <a href="connect.html" class="nav-link active" data-section="connect">
+                    <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                        xmlns="http://www.w3.org/2000/svg" stroke-width="2.5" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <polyline points="16 18 22 12 16 6"></polyline>
+                        <polyline points="8 6 2 12 8 18"></polyline>
+                    </svg> Connect AWS
+                </a>
+                <a href="analyze.html" class="nav-link" data-section="analyze">
+                    <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                        xmlns="http://www.w3.org/2000/svg" stroke-width="2.5" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg> Analyze
+                </a>
+                <a href="dashboard.html" class="nav-link" data-section="dashboard">
+                    <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                        xmlns="http://www.w3.org/2000/svg" stroke-width="2.5" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
+                    </svg> Live Dashboard
+                </a>
+            </div>
+            <button class="nav-toggle" id="navToggle" aria-label="Toggle menu">
+                <span></span><span></span><span></span>
+            </button>
+        </div>
+    </nav>
+
+    <div class="scroll-progress" id="scrollProgress"></div>
+
+    <main class="workflow-main section">
+        <div class="container">
+            <div class="workflow-shell reveal">
+                <span class="section-label">Step 1 — AWS Connection</span>
+                <h1 class="section-title">Connect Your <em>AWS Account</em></h1>
+                <p class="section-subtitle">Provide read-only credentials once. Green Lambda will auto-discover Lambda functions and historical CloudWatch metrics.</p>
+
+                <form id="connectAwsForm" class="workflow-form" autocomplete="off">
+                    <div class="form-grid-2">
+                        <div class="form-group">
+                            <label class="form-label" for="awsAccessKey">AWS Access Key ID</label>
+                            <input class="form-control" id="awsAccessKey" name="awsAccessKey" type="text" placeholder="AKIA..." required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="awsSecretKey">AWS Secret Access Key</label>
+                            <input class="form-control" id="awsSecretKey" name="awsSecretKey" type="password" placeholder="••••••••••••••••" required>
+                        </div>
+                    </div>
+
+                    <div class="form-grid-2">
+                        <div class="form-group">
+                            <label class="form-label" for="awsRegion">Primary Region</label>
+                            <select class="form-control" id="awsRegion" name="awsRegion" required>
+                                <option value="us-east-1">us-east-1 (N. Virginia)</option>
+                                <option value="us-east-2">us-east-2 (Ohio)</option>
+                                <option value="us-west-1">us-west-1 (N. California)</option>
+                                <option value="us-west-2">us-west-2 (Oregon)</option>
+                                <option value="ap-south-1" selected>ap-south-1 (Mumbai)</option>
+                                <option value="eu-west-1">eu-west-1 (Ireland)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="awsSessionToken">Session Token (Optional)</label>
+                            <input class="form-control" id="awsSessionToken" name="awsSessionToken" type="password" placeholder="Only if using temporary credentials">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="awsAccountAlias">Account Alias (Optional)</label>
+                        <input class="form-control" id="awsAccountAlias" name="awsAccountAlias" type="text" placeholder="e.g. production-account">
+                    </div>
+
+                    <div class="workflow-actions">
+                        <button type="submit" class="btn btn-primary" id="connectAwsBtn">
+                            <span class="fold"></span>
+                            <div class="points_wrapper"><i class="point"></i><i class="point"></i><i class="point"></i><i
+                                    class="point"></i><i class="point"></i><i class="point"></i><i class="point"></i><i
+                                    class="point"></i><i class="point"></i><i class="point"></i></div>
+                            <span class="inner">
+                                <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                                    xmlns="http://www.w3.org/2000/svg" stroke-linecap="round" stroke-linejoin="round"
+                                    stroke-width="2.5">
+                                    <polyline points="16 18 22 12 16 6"></polyline>
+                                    <polyline points="8 6 2 12 8 18"></polyline>
+                                </svg> Connect AWS
+                            </span>
+                        </button>
+                    </div>
+                </form>
+
+                <div id="connectStatus" class="status-banner" role="status" aria-live="polite"></div>
+
+                <section id="connectedFunctionsWrap" class="connected-functions" hidden>
+                    <div class="flex-header">
+                        <h3>Discovered Lambda Functions</h3>
+                        <span class="result-sub" id="functionCount">0 functions</span>
+                    </div>
+                    <div class="function-list" id="functionList"></div>
+                    <div class="workflow-actions" style="margin-top:1.5rem;">
+                        <a href="analyze.html" class="btn btn-ghost" id="gotoAnalyzeBtn">
+                            <span class="inner">
+                                <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                                    xmlns="http://www.w3.org/2000/svg" stroke-linecap="round" stroke-linejoin="round"
+                                    stroke-width="2.5">
+                                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                                    <polyline points="12 5 19 12 12 19"></polyline>
+                                </svg> Continue to Function Analysis
+                            </span>
+                        </a>
+                    </div>
+                </section>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="footer-inner">
+            <div class="footer-left">
+                <span class="footer-brand">⚡ Green Lambda</span>
+                <span class="footer-copy">© 2026 Green Lambda. All rights reserved.</span>
+            </div>
+            <div class="footer-right">
+                <span>AWS Auto Discovery + ML Forecasting</span>
+                <span class="footer-sep">|</span>
+                <span>Mini Project — SEM 4</span>
+            </div>
+        </div>
+    </footer>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/simplex-noise/2.4.0/simplex-noise.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+    <!-- Supabase Logic -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabaseClient.js"></script>
+    <script src="script.js"></script>
+</body>
+
+</html>
