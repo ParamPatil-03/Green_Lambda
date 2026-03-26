@@ -10,7 +10,7 @@
         const hasSeenLoader = sessionStorage.getItem('greenlambda.hasSeenLoader');
 
         const loaderAnimation = document.querySelector('.ic-loader-animation');
-        
+
         // If they have already seen the loader in this session and are NOT reloading, abort injection
         if (!isReload && hasSeenLoader) return;
 
@@ -1059,7 +1059,7 @@ function initCharts() {
 
     const scatterCtx = document.getElementById('scatterChart');
     if (scatterCtx) {
-        const data = [{"x": 4.989, "y": 4.989}, {"x": 4.345, "y": 4.344}, {"x": 4.989, "y": 4.989}, {"x": 1.906, "y": 1.906}, {"x": 1.635, "y": 1.635}, {"x": 2.832, "y": 2.832}, {"x": 1.441, "y": 1.441}, {"x": 1.739, "y": 1.740}, {"x": 3.818, "y": 3.818}, {"x": 3.109, "y": 3.109}, {"x": 2.070, "y": 2.070}, {"x": 1.739, "y": 1.739}, {"x": 5.159, "y": 5.163}, {"x": 4.095, "y": 4.095}, {"x": 4.013, "y": 4.013}, {"x": 3.818, "y": 3.819}, {"x": 1.441, "y": 1.441}, {"x": 0.356, "y": 0.356}, {"x": 2.464, "y": 2.464}, {"x": 0.356, "y": 0.356}, {"x": 4.585, "y": 4.585}, {"x": 3.818, "y": 3.818}, {"x": 4.826, "y": 4.826}, {"x": 2.231, "y": 2.231}, {"x": 5.074, "y": 5.063}, {"x": 0.771, "y": 0.771}, {"x": 3.352, "y": 3.352}, {"x": 2.231, "y": 2.231}, {"x": 1.988, "y": 1.988}, {"x": 3.565, "y": 3.565}, {"x": 2.708, "y": 2.708}, {"x": 4.013, "y": 4.013}, {"x": 2.708, "y": 2.708}, {"x": 1.635, "y": 1.635}, {"x": 2.593, "y": 2.591}, {"x": 5.159, "y": 5.159}, {"x": 0.056, "y": 0.056}, {"x": 4.585, "y": 4.585}, {"x": 4.095, "y": 4.095}, {"x": 4.423, "y": 4.423}, {"x": 0.356, "y": 0.356}, {"x": 3.818, "y": 3.818}, {"x": 1.821, "y": 1.821}, {"x": 3.191, "y": 3.190}, {"x": 4.181, "y": 4.180}, {"x": 2.593, "y": 2.593}, {"x": 4.505, "y": 4.505}, {"x": 2.464, "y": 2.464}, {"x": 0.056, "y": 0.056}, {"x": 4.505, "y": 4.505}, {"x": 1.739, "y": 1.739}, {"x": 4.989, "y": 4.989}, {"x": 4.013, "y": 4.013}, {"x": 2.593, "y": 2.593}, {"x": 4.345, "y": 4.345}, {"x": 1.441, "y": 1.441}, {"x": 2.593, "y": 2.593}, {"x": 4.585, "y": 4.585}, {"x": 2.149, "y": 2.149}, {"x": 3.109, "y": 3.109}];
+        const data = [{ "x": 4.989, "y": 4.989 }, { "x": 4.345, "y": 4.344 }, { "x": 4.989, "y": 4.989 }, { "x": 1.906, "y": 1.906 }, { "x": 1.635, "y": 1.635 }, { "x": 2.832, "y": 2.832 }, { "x": 1.441, "y": 1.441 }, { "x": 1.739, "y": 1.740 }, { "x": 3.818, "y": 3.818 }, { "x": 3.109, "y": 3.109 }, { "x": 2.070, "y": 2.070 }, { "x": 1.739, "y": 1.739 }, { "x": 5.159, "y": 5.163 }, { "x": 4.095, "y": 4.095 }, { "x": 4.013, "y": 4.013 }, { "x": 3.818, "y": 3.819 }, { "x": 1.441, "y": 1.441 }, { "x": 0.356, "y": 0.356 }, { "x": 2.464, "y": 2.464 }, { "x": 0.356, "y": 0.356 }, { "x": 4.585, "y": 4.585 }, { "x": 3.818, "y": 3.818 }, { "x": 4.826, "y": 4.826 }, { "x": 2.231, "y": 2.231 }, { "x": 5.074, "y": 5.063 }, { "x": 0.771, "y": 0.771 }, { "x": 3.352, "y": 3.352 }, { "x": 2.231, "y": 2.231 }, { "x": 1.988, "y": 1.988 }, { "x": 3.565, "y": 3.565 }, { "x": 2.708, "y": 2.708 }, { "x": 4.013, "y": 4.013 }, { "x": 2.708, "y": 2.708 }, { "x": 1.635, "y": 1.635 }, { "x": 2.593, "y": 2.591 }, { "x": 5.159, "y": 5.159 }, { "x": 0.056, "y": 0.056 }, { "x": 4.585, "y": 4.585 }, { "x": 4.095, "y": 4.095 }, { "x": 4.423, "y": 4.423 }, { "x": 0.356, "y": 0.356 }, { "x": 3.818, "y": 3.818 }, { "x": 1.821, "y": 1.821 }, { "x": 3.191, "y": 3.190 }, { "x": 4.181, "y": 4.180 }, { "x": 2.593, "y": 2.593 }, { "x": 4.505, "y": 4.505 }, { "x": 2.464, "y": 2.464 }, { "x": 0.056, "y": 0.056 }, { "x": 4.505, "y": 4.505 }, { "x": 1.739, "y": 1.739 }, { "x": 4.989, "y": 4.989 }, { "x": 4.013, "y": 4.013 }, { "x": 2.593, "y": 2.593 }, { "x": 4.345, "y": 4.345 }, { "x": 1.441, "y": 1.441 }, { "x": 2.593, "y": 2.593 }, { "x": 4.585, "y": 4.585 }, { "x": 2.149, "y": 2.149 }, { "x": 3.109, "y": 3.109 }];
         new Chart(scatterCtx, {
             type: 'scatter',
             data: {
@@ -1375,11 +1375,11 @@ function createDemoAnalysis({ baselineRph, functionName, model }) {
     };
 
     const profile = fnProfiles[functionName] || { energyWh: 1.5, confidence: 0.93, memoryMb: 512, avgDurationMs: 500 };
-    
+
     // Create deterministic variations per model so clicking a different model genuinely changes the prediction!
     let energyMod = 1.0;
     let confMod = 1.0;
-    
+
     if (model === 'rf') {
         energyMod = 1.002;  // RF predicts slightly higher variance
         confMod = 0.985;    // RF confidence is slightly lower than XGBoost
@@ -1498,7 +1498,7 @@ async function checkAuth() {
         } catch (err) {
             console.warn("Supabase auth failed. Continuing to Demo Check:", err.message);
         }
-        
+
         // ── Check Demo Bypass Fallback ──
         const demoEmail = localStorage.getItem('green_lambda_demo_user');
         if (!user && demoEmail) {
@@ -1626,7 +1626,7 @@ async function initConnectPage() {
 
     const existing = getSession();
     const instructionsInfo = document.getElementById('awsInstructions');
-    
+
     if (existing?.functions?.length) {
         if (instructionsInfo) instructionsInfo.style.display = 'none';
         wrap.hidden = false;
@@ -2424,7 +2424,7 @@ function initLoginPage() {
                     // so the new legitimate user gets a 100% clean profile.
                     localStorage.removeItem('greenlambda.session');
                     localStorage.removeItem('green_lambda_demo_user');
-                    
+
                     loginStatus.textContent = 'Success! Redirecting...';
                     loginStatus.className = 'fc-status ok';
                     setTimeout(() => {
@@ -2446,7 +2446,7 @@ function initLoginPage() {
 /* --- Global Session Checker for UI Profile Avatar --- */
 async function checkAuthStatus() {
     if (!window.supabaseClient) return;
-    
+
     try {
         let session = null;
         let activeUserEmail = null;
@@ -2459,25 +2459,25 @@ async function checkAuthStatus() {
                 console.warn("Supabase getSession failed, continuing local check:", err.message);
             }
         }
-        
+
         // ── Check Demo Bypass Fallback ──
         const demoEmail = localStorage.getItem('green_lambda_demo_user');
-        
+
         if (session && session.user) {
             activeUserEmail = session.user.email;
         } else if (demoEmail) {
             session = true; // Mock true to force UI update
             activeUserEmail = demoEmail;
         }
-        
+
         // This targets the specific Get Started button on index.html, dashboard.html, etc.
         const authBtnProfile = document.getElementById('authBtnProfile');
         const authBtnInner = document.getElementById('authBtnInner');
         const homeConnectAwsBtn = document.getElementById('homeConnectAwsBtn');
-        
+
         // If a session exists, we swap the UI!
         if (session) {
-            
+
             // Re-route the bottom CTA directly to AWS dashboard since they are logged in!
             if (homeConnectAwsBtn) {
                 homeConnectAwsBtn.href = 'connect.html';
@@ -2485,25 +2485,25 @@ async function checkAuthStatus() {
             }
 
             if (authBtnProfile && authBtnInner) {
-            
-            // Extract their email prefix to use as a username
-            const username = (activeUserEmail || "verified").split('@')[0];
-            
-            // 1. Hide the entire "Get Started" button completely
-            authBtnProfile.style.display = 'none';
 
-            // 2. Check if avatar already exists (to avoid duplicate injection on redraws)
-            if (!document.getElementById('greenLambdaAvatar')) {
-                // Create a container specifically for the avatar + dropdown relative positioning
-                const avatarContainer = document.createElement('div');
-                avatarContainer.id = 'greenLambdaAvatarContainer';
-                avatarContainer.style.position = 'relative';
+                // Extract their email prefix to use as a username
+                const username = (activeUserEmail || "verified").split('@')[0];
 
-                // 3. Create a modern circular Profile Avatar
-                const avatarBtn = document.createElement('div');
-                avatarBtn.id = 'greenLambdaAvatar';
-                avatarBtn.title = `Logged in as ${username}`;
-                avatarBtn.style.cssText = `
+                // 1. Hide the entire "Get Started" button completely
+                authBtnProfile.style.display = 'none';
+
+                // 2. Check if avatar already exists (to avoid duplicate injection on redraws)
+                if (!document.getElementById('greenLambdaAvatar')) {
+                    // Create a container specifically for the avatar + dropdown relative positioning
+                    const avatarContainer = document.createElement('div');
+                    avatarContainer.id = 'greenLambdaAvatarContainer';
+                    avatarContainer.style.position = 'relative';
+
+                    // 3. Create a modern circular Profile Avatar
+                    const avatarBtn = document.createElement('div');
+                    avatarBtn.id = 'greenLambdaAvatar';
+                    avatarBtn.title = `Logged in as ${username}`;
+                    avatarBtn.style.cssText = `
                     width: 40px;
                     height: 40px;
                     border-radius: 50%;
@@ -2519,18 +2519,18 @@ async function checkAuthStatus() {
                     cursor: pointer;
                     transition: transform 0.2s ease, box-shadow 0.2s ease;
                 `;
-                
-                // Set the initial of their username inside the circle
-                avatarBtn.textContent = username.charAt(0);
 
-                // Add hover animations
-                avatarBtn.onmouseover = () => { avatarBtn.style.boxShadow = '0 0 20px rgba(0,240,255,0.7)'; };
-                avatarBtn.onmouseout = () => { avatarBtn.style.boxShadow = '0 0 12px rgba(200,255,0,0.5)'; };
+                    // Set the initial of their username inside the circle
+                    avatarBtn.textContent = username.charAt(0);
 
-                // 4. Create the Dropdown Popup Menu
-                const dropdown = document.createElement('div');
-                dropdown.id = 'greenLambdaDropdown';
-                dropdown.style.cssText = `
+                    // Add hover animations
+                    avatarBtn.onmouseover = () => { avatarBtn.style.boxShadow = '0 0 20px rgba(0,240,255,0.7)'; };
+                    avatarBtn.onmouseout = () => { avatarBtn.style.boxShadow = '0 0 12px rgba(200,255,0,0.5)'; };
+
+                    // 4. Create the Dropdown Popup Menu
+                    const dropdown = document.createElement('div');
+                    dropdown.id = 'greenLambdaDropdown';
+                    dropdown.style.cssText = `
                     position: absolute;
                     top: 50px;
                     right: 0;
@@ -2546,8 +2546,8 @@ async function checkAuthStatus() {
                     animation: fadeIn 0.15s ease-out;
                 `;
 
-                // Add Dropdown Items
-                dropdown.innerHTML = `
+                    // Add Dropdown Items
+                    dropdown.innerHTML = `
                     <div style="padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.05);">
                         <div style="font-size: 0.8rem; color: #888;">Signed in as</div>
                         <div style="font-size: 0.9rem; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${activeUserEmail}</div>
@@ -2560,58 +2560,58 @@ async function checkAuthStatus() {
                     </div>
                 `;
 
-                // Assemble the DOM payload
-                avatarContainer.appendChild(avatarBtn);
-                avatarContainer.appendChild(dropdown);
-                
-                // Inject it directly next to where the Get Started button was!
-                authBtnProfile.parentNode.insertBefore(avatarContainer, authBtnProfile.nextSibling);
+                    // Assemble the DOM payload
+                    avatarContainer.appendChild(avatarBtn);
+                    avatarContainer.appendChild(dropdown);
 
-                // CSS styling for dropdown hover states dynamically
-                const style = document.createElement('style');
-                style.textContent = `
+                    // Inject it directly next to where the Get Started button was!
+                    authBtnProfile.parentNode.insertBefore(avatarContainer, authBtnProfile.nextSibling);
+
+                    // CSS styling for dropdown hover states dynamically
+                    const style = document.createElement('style');
+                    style.textContent = `
                     #greenLambdaDropdown a:hover, #logoutBtnWrapper:hover { background: rgba(255,255,255,0.05); }
                     @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
                 `;
-                document.head.appendChild(style);
+                    document.head.appendChild(style);
 
-                // Toggle dropdown on avatar click
-                avatarBtn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    const isVisible = dropdown.style.display === 'flex';
-                    dropdown.style.display = isVisible ? 'none' : 'flex';
-                });
+                    // Toggle dropdown on avatar click
+                    avatarBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const isVisible = dropdown.style.display === 'flex';
+                        dropdown.style.display = isVisible ? 'none' : 'flex';
+                    });
 
-                // Close dropdown if clicking anywhere else on the page
-                document.addEventListener('click', (e) => {
-                    if (!avatarContainer.contains(e.target)) {
-                        dropdown.style.display = 'none';
-                    }
-                });
+                    // Close dropdown if clicking anywhere else on the page
+                    document.addEventListener('click', (e) => {
+                        if (!avatarContainer.contains(e.target)) {
+                            dropdown.style.display = 'none';
+                        }
+                    });
 
-                // Logout logic natively executed
-                document.getElementById('logoutBtnWrapper').addEventListener('click', async () => {
-                    // SECURE PURGE: Completely destroy ALL mock data and cached AWS telemetry
-                    localStorage.removeItem('green_lambda_demo_user');
-                    localStorage.removeItem('greenlambda.session');
-                    
-                    // Destroy real Supabase session natively
-                    if (window.supabaseClient) {
-                        try { await window.supabaseClient.auth.signOut(); } catch(e) {}
-                    }
-                    
-                    // Native UI Reset (Remove Avatar, Bring back "Get Started", Route Connect backwards)
-                    avatarContainer.remove();
-                    authBtnProfile.style.display = 'flex';
-                    if (homeConnectAwsBtn) homeConnectAwsBtn.href = "login.html";
-                });
+                    // Logout logic natively executed
+                    document.getElementById('logoutBtnWrapper').addEventListener('click', async () => {
+                        // SECURE PURGE: Completely destroy ALL mock data and cached AWS telemetry
+                        localStorage.removeItem('green_lambda_demo_user');
+                        localStorage.removeItem('greenlambda.session');
+
+                        // Destroy real Supabase session natively
+                        if (window.supabaseClient) {
+                            try { await window.supabaseClient.auth.signOut(); } catch (e) { }
+                        }
+
+                        // Native UI Reset (Remove Avatar, Bring back "Get Started", Route Connect backwards)
+                        avatarContainer.remove();
+                        authBtnProfile.style.display = 'flex';
+                        if (homeConnectAwsBtn) homeConnectAwsBtn.href = "login.html";
+                    });
+                }
             }
+        } else {
+            // User is explicitly logged out
+            if (homeConnectAwsBtn) homeConnectAwsBtn.href = "login.html";
         }
-    } else {
-        // User is explicitly logged out
-        if (homeConnectAwsBtn) homeConnectAwsBtn.href = "login.html";
-    }
-} catch (e) {
+    } catch (e) {
         // If they bypass normally or no connection is active, just leave it as Get Started
     }
 }

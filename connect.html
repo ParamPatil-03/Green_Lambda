@@ -68,13 +68,59 @@
                 <h1 class="section-title">Connect Your <em>AWS Account</em></h1>
                 <p class="section-subtitle">Provide read-only credentials once. Green Lambda will auto-discover Lambda functions and historical CloudWatch metrics.</p>
 
-                <div id="awsInstructions" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-left: 4px solid var(--primary); padding: 1.5rem; border-radius: 8px; margin-bottom: 2rem;">
-                    <h4 style="margin-top: 0; color: var(--primary); font-size: 1.1rem; margin-bottom: 0.8rem;">How to get your API Keys:</h4>
-                    <ol style="color: var(--gray); margin-left: 1.2rem; font-size: 0.95rem; line-height: 1.6; margin-bottom: 1rem;">
-                        <li>Go to <strong>AWS Console</strong> &rarr; Search for <strong>IAM</strong> &rarr; Click <strong>Users</strong>.</li>
-                        <li>Create a new User and attach <strong>AWSLambda_ReadOnlyAccess</strong> and <strong>CloudWatchReadOnlyAccess</strong>.</li>
-                        <li>Go to Security Credentials &rarr; Create <strong>Access Key</strong> (Application running outside AWS).</li>
-                    </ol>
+                <div id="awsInstructions" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-left: 4px solid var(--primary); padding: 1.5rem 2rem; border-radius: 12px; margin-bottom: 2rem;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.8rem; margin-bottom: 1.2rem;">
+                        <h4 style="margin: 0; color: var(--primary); font-size: 1.1rem; display: flex; align-items: center; gap: 0.5rem;">
+                            🔑 How to generate your AWS Access Keys
+                        </h4>
+                        <a href="https://aws.amazon.com/console/" target="_blank" rel="noopener"
+                            style="display: inline-flex; align-items: center; gap: 0.4rem; background: rgba(204,255,0,0.12); border: 1px solid rgba(204,255,0,0.35); color: var(--primary); font-size: 0.82rem; font-weight: 600; padding: 0.35rem 0.85rem; border-radius: 20px; text-decoration: none; letter-spacing: 0.02em; white-space: nowrap;">
+                            ↗ Go to AWS Console
+                        </a>
+                    </div>
+
+                    <!-- Step 1 -->
+                    <div style="display: flex; gap: 1rem; margin-bottom: 1.1rem; align-items: flex-start;">
+                        <span style="background: var(--primary); color: #000; font-weight: 700; font-size: 0.75rem; border-radius: 50%; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 2px;">1</span>
+                        <div>
+                            <strong style="color: rgba(255,255,255,0.9);">Open the AWS IAM Console</strong>
+                            <p style="color: var(--gray); margin: 0.2rem 0 0; font-size: 0.88rem;">Log into your AWS account and navigate to the IAM (Identity and Access Management) service. This is where all user credentials are managed.</p>
+                            <a href="https://console.aws.amazon.com/iam/home#/users" target="_blank" rel="noopener" style="color: var(--primary); font-size: 0.85rem; text-decoration: none; display: inline-flex; align-items: center; gap: 0.3rem; margin-top: 0.4rem;">
+                                ↗ Open AWS IAM Users Console
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Step 2 -->
+                    <div style="display: flex; gap: 1rem; margin-bottom: 1.1rem; align-items: flex-start;">
+                        <span style="background: var(--primary); color: #000; font-weight: 700; font-size: 0.75rem; border-radius: 50%; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 2px;">2</span>
+                        <div>
+                            <strong style="color: rgba(255,255,255,0.9);">Create a New IAM User</strong>
+                            <p style="color: var(--gray); margin: 0.2rem 0 0; font-size: 0.88rem;">Click <strong>Create user</strong>, give it any name (e.g. <code style="background:rgba(255,255,255,0.08); padding: 1px 5px; border-radius: 4px;">greenlambda-reader</code>), and under <strong>Permissions</strong> choose <em>Attach policies directly</em>. Search and attach both:
+                            <br><code style="background:rgba(255,255,255,0.08); padding: 1px 5px; border-radius: 4px; margin-top: 4px; display: inline-block;">AWSLambda_ReadOnlyAccess</code> &nbsp;+&nbsp; <code style="background:rgba(255,255,255,0.08); padding: 1px 5px; border-radius: 4px;">CloudWatchReadOnlyAccess</code></p>
+                        </div>
+                    </div>
+
+                    <!-- Step 3 -->
+                    <div style="display: flex; gap: 1rem; margin-bottom: 1.1rem; align-items: flex-start;">
+                        <span style="background: var(--primary); color: #000; font-weight: 700; font-size: 0.75rem; border-radius: 50%; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 2px;">3</span>
+                        <div>
+                            <strong style="color: rgba(255,255,255,0.9);">Generate the Access Key</strong>
+                            <p style="color: var(--gray); margin: 0.2rem 0 0; font-size: 0.88rem;">Click on your newly created user → go to the <strong>Security credentials</strong> tab → scroll down and click <strong>Create access key</strong>. When prompted for use case, select <em>"Application running outside AWS"</em>.</p>
+                            <a href="https://console.aws.amazon.com/iam/home#/security_credentials" target="_blank" rel="noopener" style="color: var(--primary); font-size: 0.85rem; text-decoration: none; display: inline-flex; align-items: center; gap: 0.3rem; margin-top: 0.4rem;">
+                                ↗ Open Security Credentials Page
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Step 4 -->
+                    <div style="display: flex; gap: 1rem; align-items: flex-start;">
+                        <span style="background: var(--primary); color: #000; font-weight: 700; font-size: 0.75rem; border-radius: 50%; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 2px;">4</span>
+                        <div>
+                            <strong style="color: rgba(255,255,255,0.9);">Copy &amp; Paste the Keys below</strong>
+                            <p style="color: var(--gray); margin: 0.2rem 0 0; font-size: 0.88rem;">AWS will show you the <strong>Access Key ID</strong> (starts with <code style="background:rgba(255,255,255,0.08); padding: 1px 5px; border-radius: 4px;">AKIA…</code>) and the <strong>Secret Access Key</strong>. Copy both and paste them into the fields below. <span style="color: #ff8a8a;">⚠ The Secret Key is only shown once — save it immediately!</span></p>
+                        </div>
+                    </div>
                 </div>
 
                 <form id="connectAwsForm" class="workflow-form" autocomplete="off">
