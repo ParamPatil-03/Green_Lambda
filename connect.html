@@ -68,6 +68,15 @@
                 <h1 class="section-title">Connect Your <em>AWS Account</em></h1>
                 <p class="section-subtitle">Provide read-only credentials once. Green Lambda will auto-discover Lambda functions and historical CloudWatch metrics.</p>
 
+                <div id="awsInstructions" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-left: 4px solid var(--primary); padding: 1.5rem; border-radius: 8px; margin-bottom: 2rem;">
+                    <h4 style="margin-top: 0; color: var(--primary); font-size: 1.1rem; margin-bottom: 0.8rem;">How to get your API Keys:</h4>
+                    <ol style="color: var(--gray); margin-left: 1.2rem; font-size: 0.95rem; line-height: 1.6; margin-bottom: 1rem;">
+                        <li>Go to <strong>AWS Console</strong> &rarr; Search for <strong>IAM</strong> &rarr; Click <strong>Users</strong>.</li>
+                        <li>Create a new User and attach <strong>AWSLambda_ReadOnlyAccess</strong> and <strong>CloudWatchReadOnlyAccess</strong>.</li>
+                        <li>Go to Security Credentials &rarr; Create <strong>Access Key</strong> (Application running outside AWS).</li>
+                    </ol>
+                </div>
+
                 <form id="connectAwsForm" class="workflow-form" autocomplete="off">
                     <div class="form-grid-2">
                         <div class="form-group">

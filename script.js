@@ -5,10 +5,18 @@
     let retries = 0;
 
     function injectGreenLambdaLoader() {
+        // Evaluate Navigation State: Only play animation on First Load OR Explicit Reload
+        const isReload = performance.getEntriesByType("navigation")?.[0]?.type === "reload";
+        const hasSeenLoader = sessionStorage.getItem('greenlambda.hasSeenLoader');
+
         const loaderAnimation = document.querySelector('.ic-loader-animation');
+        
+        // If they have already seen the loader in this session and are NOT reloading, abort injection
+        if (!isReload && hasSeenLoader) return;
 
         if (loaderAnimation) {
             console.log('Found loader animation container, injecting GREEN LAMBDA...');
+            sessionStorage.setItem('greenlambda.hasSeenLoader', 'true');
 
             loaderAnimation.innerHTML = '';
 
@@ -1480,9 +1488,9 @@ function createDemoLiveMetrics(predictedReqPerHour) {
 /* ─── AUTH HELPERS ─────────────────────────────────────── */
 
 async function checkAuth() {
-    if (!window.supabase && !window.supabaseClient) return null;
+    if (!window.supabaseClient) return null;
     try {
-        const client = window.supabase || window.supabaseClient;
+        const client = window.supabaseClient;
         let user = null;
         try {
             const { data: { session } } = await client.auth.getSession();
@@ -1505,32 +1513,8 @@ async function checkAuth() {
                 // Also, if it's the demo-user-123, skip the DB lookup natively because they have no DB records!
                 if (user.id === 'demo-user-123') {
                     // Do nothing for demo user, let them reach the Connect AWS page
-                } else if (client) {
-                    const { data: conns } = await client
-                        .from('aws_connections')
-                        .select('*, lambda_functions(function_name, runtime, memory_mb)')
-                        .eq('user_id', user.id)
-                        .order('created_at', { ascending: false })
-                        .limit(1);
-
-                    if (conns && conns.length > 0) {
-                        const dbConn = conns[0];
-                        const fnList = (dbConn.lambda_functions || []).map(f => ({
-                            name: f.function_name,
-                            runtime: f.runtime,
-                            memoryMb: f.memory_mb
-                        }));
-
-                        setSession({
-                            connectionId: dbConn.id,
-                            region: dbConn.region,
-                            accountAlias: dbConn.account_alias,
-                            mode: 'live',
-                            functions: fnList,
-                            connectedAt: dbConn.created_at
-                        });
-                    }
                 }
+                // (Server Synchronization Disabled: The user must explicitly Connect AWS rather than downloading legacy tests)
             }
         }
         return user;
@@ -1561,31 +1545,7 @@ function initLoginPage() {
         labelSignup?.addEventListener('click', () => { toggle.checked = true; toggle.dispatchEvent(new Event('change')); });
     }
 
-    // ── Login form (front face of flip card) ──────────────
-    const loginForm = document.getElementById('loginForm');
-    const loginStatus = document.getElementById('loginStatus');
-    const loginSubmit = document.getElementById('loginSubmitBtn');
-    const forgotBtn = document.getElementById('forgotPasswordBtn');
-
-    if (loginForm) {
-        loginForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const email = document.getElementById('loginEmail').value.trim();
-            const password = document.getElementById('loginPassword').value;
-            loginSubmit.disabled = true;
-            setBanner(loginStatus, 'loading', 'Logging in\u2026');
-            try {
-                if (!window.supabase) throw new Error('Supabase not initialised.');
-                const { error } = await window.supabase.auth.signInWithPassword({ email, password });
-                if (error) throw error;
-                window.location.href = 'dashboard.html';
-            } catch (err) {
-                setBanner(loginStatus, 'error', err.message || 'Login failed.');
-                loginSubmit.disabled = false;
-            }
-        });
-    }
-
+    // ── Forgot password handler ──
     if (forgotBtn) {
         forgotBtn.addEventListener('click', async () => {
             const email = document.getElementById('loginEmail')?.value.trim();
@@ -1665,7 +1625,10 @@ async function initConnectPage() {
     if (!form) return;
 
     const existing = getSession();
+    const instructionsInfo = document.getElementById('awsInstructions');
+    
     if (existing?.functions?.length) {
+        if (instructionsInfo) instructionsInfo.style.display = 'none';
         wrap.hidden = false;
         renderFunctionList(existing.functions, list, count);
         setBanner(status, 'ok', `Your AWS connection was loaded securely from your account! You can go straight to Analysis, or reconnect to refresh your functions.`);
@@ -1754,6 +1717,7 @@ async function initConnectPage() {
         }
 
         setSession(session);
+        if (instructionsInfo) instructionsInfo.style.display = 'none';
         wrap.hidden = false;
         renderFunctionList(functions, list, count);
 
@@ -2433,28 +2397,34 @@ function initLoginPage() {
             btn.disabled = true;
 
             try {
+                // 1. Smart Dummy Email Detection
+                const dummyKeywords = ['demo@', 'test@', 'dummy@', '@example.com', '@test.com'];
+                const isDummyEmail = dummyKeywords.some(keyword => email.toLowerCase().includes(keyword));
+
+                if (isDummyEmail) {
+                    loginStatus.textContent = "Presentation Override: Securely connecting Offline Mode...";
+                    loginStatus.className = 'fc-status ok';
+                    localStorage.setItem('green_lambda_demo_user', email);
+                    setTimeout(() => window.location.href = 'index.html', 1200);
+                    return;
+                }
+
+                // 2. Legitimate Cloud Authentication Route
                 const { data, error } = await window.supabaseClient.auth.signInWithPassword({
                     email: email,
                     password: password,
                 });
 
                 if (error) {
-                    if (error.message.toLowerCase().includes("email not confirmed") || error.message.toLowerCase().includes("verify your email")) {
-                        loginStatus.textContent = "Demo Security: Bypassing Email Verification...";
-                        loginStatus.className = 'fc-status ok';
-                        
-                        // INJECT MOCK SESSION FOR DEMO UI
-                        localStorage.setItem('green_lambda_demo_user', email);
-                        
-                        setTimeout(() => {
-                            window.location.href = 'index.html';
-                        }, 1200);
-                    } else {
-                        loginStatus.textContent = error.message;
-                        loginStatus.className = 'fc-status error';
-                        btn.disabled = false;
-                    }
+                    loginStatus.textContent = error.message;
+                    loginStatus.className = 'fc-status error';
+                    btn.disabled = false;
                 } else {
+                    // SECURE PURGE: Completely destroy any leftover caches from previous Demo sessions or alternate users
+                    // so the new legitimate user gets a 100% clean profile.
+                    localStorage.removeItem('greenlambda.session');
+                    localStorage.removeItem('green_lambda_demo_user');
+                    
                     loginStatus.textContent = 'Success! Redirecting...';
                     loginStatus.className = 'fc-status ok';
                     setTimeout(() => {
@@ -2621,8 +2591,10 @@ async function checkAuthStatus() {
 
                 // Logout logic natively executed
                 document.getElementById('logoutBtnWrapper').addEventListener('click', async () => {
-                    // Destroy mock demo session
+                    // SECURE PURGE: Completely destroy ALL mock data and cached AWS telemetry
                     localStorage.removeItem('green_lambda_demo_user');
+                    localStorage.removeItem('greenlambda.session');
+                    
                     // Destroy real Supabase session natively
                     if (window.supabaseClient) {
                         try { await window.supabaseClient.auth.signOut(); } catch(e) {}
