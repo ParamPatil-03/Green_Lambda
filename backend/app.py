@@ -364,5 +364,38 @@ def predict_spike():
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
+@app.route('/live-metrics', methods=['GET'])
+def get_live_metrics():
+    """
+    Simulates real-time CloudWatch telemetry for the connected AWS account.
+    Generates realistic hour-over-hour traffic deviations to demonstrate ML anomaly detection.
+    """
+    try:
+        fn_name = request.args.get('functionName', 'unknown-function')
+        
+        # Pull the mathematically predicted baseline traffic (passed from the Spike Analysis phase ideally)
+        # Using a solid baseline 10,000 for realistic simulation if none exists natively
+        predicted = float(request.args.get('baselineRph', 10000))
+        
+        # Generate mathematically robust, realistic internet traffic jitter (-5% to +6%)
+        import random
+        drift = random.uniform(-0.05, 0.06)
+        
+        # 1-in-12 chance of simulating a massive Traffic Anomaly (DDoS or Virality event)
+        if random.random() < 0.08:
+            drift = random.uniform(0.25, 0.45) # 25% to 45% sudden surge
+            
+        actual = predicted * (1.0 + drift)
+        deviation_pct = drift * 100.0
+        
+        return jsonify({
+            "predictedReqPerHour": int(predicted),
+            "actualReqPerHour": int(actual),
+            "deviationPct": round(deviation_pct, 2)
+        }), 200
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 if __name__ == '__main__':
     app.run(port=5000, debug=True)

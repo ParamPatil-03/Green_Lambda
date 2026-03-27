@@ -4302,6 +4302,67 @@ input:checked+.slider:before {
     background-position: 0 0 !important;
 }
 
+/* === Live Dashboard Data Table UI === */
+.fn-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+    font-size: 0.9rem;
+    text-align: left;
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.fn-table th {
+    background: rgba(255, 255, 255, 0.05);
+    color: rgba(255, 255, 255, 0.6);
+    font-weight: 600;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-size: 0.8rem;
+}
+
+.fn-table td {
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    color: rgba(255, 255, 255, 0.85);
+    transition: background-color 0.2s ease;
+}
+
+.fn-table tbody tr:hover td {
+    background-color: rgba(200, 255, 0, 0.03);
+}
+
+.fn-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+/* Beautiful Pill Badges inside the table */
+.fn-table .badge {
+    padding: 0.35rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    display: inline-block;
+}
+
+.fn-table .badge.optimal {
+    background: rgba(100, 255, 120, 0.15);
+    color: #64ff78;
+    border: 1px solid rgba(100, 255, 120, 0.3);
+}
+
+.fn-table .badge.warning {
+    background: rgba(255, 80, 80, 0.15);
+    color: #ff5050;
+    border: 1px solid rgba(255, 80, 80, 0.3);
+}
+
 /* MODEL SELECTOR WHEEL */
 .wheel-selector {
     position: relative;

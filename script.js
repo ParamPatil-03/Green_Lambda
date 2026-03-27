@@ -2183,9 +2183,13 @@ function initDashboardPage() {
         let mode = 'live';
 
         try {
+            const forecastInfo = getStoredJson(GREENLAMBDA_KEYS.forecast) || {};
+            const activeBaseline = forecastInfo.predictedReqPerHour || forecastInfo.baselineRph || 10000;
+            
             response = await apiRequest(`/live-metrics?${toQuery({
                 connectionId: session.connectionId,
-                functionName
+                functionName,
+                baselineRph: activeBaseline
             })}`);
         } catch (error) {
             mode = 'demo';
@@ -2264,37 +2268,54 @@ function updateOptimizationAlerts(deviationPct, predicted, actual, functionName)
     const isOver = actual > predicted;
     const alerts = [];
 
+    // Map severities to visual payloads perfectly matching analyze.html UI
+    const severities = {
+        ok: { color: 'rgba(100,255,120,0.1)', border: 'rgba(100,255,120,0.35)', icon: '🟢' },
+        warning: { color: 'rgba(255,200,0,0.1)', border: 'rgba(255,200,0,0.35)', icon: '🟡' },
+        critical: { color: 'rgba(255,80,80,0.12)', border: 'rgba(255,80,80,0.4)', icon: '🔴' }
+    };
+
     if (abs <= 8) {
-        alerts.push({ type: 'opt-ok', msg: `✅ System Healthy: Actual traffic (${formatNumber(actual)} req/hr) is within 8% of forecast. No action needed.` });
+        alerts.push({ 
+            sev: 'ok', 
+            title: 'System Healthy', 
+            detail: `Actual traffic (<strong>${formatNumber(actual)} req/hr</strong>) is within <strong>${abs.toFixed(1)}%</strong> of forecast.`, 
+            fix: 'No networking adjustment needed. CloudWatch tracking remains fully optimal.' 
+        });
     } else if (abs > 8 && abs <= 20) {
-        alerts.push({ type: 'opt-warning', msg: `⚠️ Mild Drift Detected (${deviationPct.toFixed(1)}%): ${isOver ? 'Actual exceeds forecast.' : 'Traffic below forecast.'} Monitor closely for the next 30 minutes.` });
-        if (isOver) {
-            alerts.push({ type: 'opt-warning', msg: `💡 Suggestion: Consider enabling AWS Lambda Provisioned Concurrency on "${functionName}" to avoid cold-start latency spikes during elevated load.` });
-        } else {
-            alerts.push({ type: 'opt-warning', msg: `💡 Suggestion: Traffic is lower than predicted. Consider scaling down memory configuration to reduce idle compute cost.` });
-        }
+        alerts.push({ 
+            sev: 'warning', 
+            title: `Mild Drift Detected (${deviationPct.toFixed(1)}%)`, 
+            detail: isOver ? 'Actual live traffic slightly exceeds ML forecasting.' : 'Traffic volume is idling below ML forecast.', 
+            fix: isOver ? `Consider enabling AWS Lambda Provisioned Concurrency on <strong>"${functionName}"</strong> to aggressively fight cold-start latency.` : 'Scale down the function\'s reserved memory configuration to slash idle compute cost.' 
+        });
     } else if (abs > 20 && abs <= 40) {
-        alerts.push({ type: 'opt-danger', msg: `🔴 Significant Anomaly (${deviationPct.toFixed(1)}%): ${isOver ? 'Traffic dramatically exceeds forecast!' : 'Traffic severely under forecast.'}` });
-        if (isOver) {
-            alerts.push({ type: 'opt-danger', msg: `🚨 Action Required: Actual traffic is ${abs.toFixed(0)}% above prediction. Check for unexpected invocation bursts. Enable CloudWatch Alarms on "Throttles" and "ConcurrentExecutions".` });
-            alerts.push({ type: 'opt-warning', msg: `💡 Cost Advisory: At current deviation, estimated monthly cost may increase by ~₹${Math.round((abs / 100) * 2400)}. Consider setting Lambda reserved concurrency to cap runaway spend.` });
-        } else {
-            alerts.push({ type: 'opt-warning', msg: `💡 Efficiency Opportunity: Traffic is ${abs.toFixed(0)}% below forecast. Your Lambda may be over-provisioned. Reducing memory from current config could save ~₹${Math.round((abs / 100) * 1200)}/month.` });
-        }
+        alerts.push({ 
+            sev: 'critical', 
+            title: `Significant Anomaly (${deviationPct.toFixed(1)}%)`, 
+            detail: isOver ? 'Traffic dramatically exceeds baseline forecasting constraints.' : 'Traffic severely under-utilizing baseline compute.',
+            fix: isOver ? `Estimated cost hike: <strong>~₹${Math.round((abs / 100) * 2400)}</strong>. Enable CloudWatch Alarms immediately on "Throttles".` : `Your Lambda is heavily over-provisioned. Downsizing memory could save <strong>~₹${Math.round((abs / 100) * 1200)}/month</strong>.` 
+        });
     } else {
-        alerts.push({ type: 'opt-danger', msg: `🚨 Critical Deviation (${deviationPct.toFixed(1)}%): Immediate attention required!` });
-        if (isOver) {
-            alerts.push({ type: 'opt-danger', msg: `⚡ Emergency: Traffic is ${abs.toFixed(0)}% above forecast — likely a traffic spike or DDoS. Consider enabling AWS Lambda throttling or WAF rules immediately.` });
-            alerts.push({ type: 'opt-danger', msg: `💸 Cost Alert: Uncontrolled burst at this deviation could cost an extra ₹${Math.round((abs / 100) * 6000)}+/month. Enable AWS Budgets alert threshold at 80%.` });
-        } else {
-            alerts.push({ type: 'opt-danger', msg: `📉 Dead Traffic: Actual is ${abs.toFixed(0)}% below forecast. Check if your Lambda trigger (API Gateway, SQS, etc.) is misconfigured or inactive.` });
-        }
+        alerts.push({ 
+            sev: 'critical', 
+            title: `Critical Deviation (${deviationPct.toFixed(1)}%)`,
+            detail: 'Serverless telemetry has completely detached from predictive forecasting models.',
+            fix: isOver ? `<strong>DDoS Risk:</strong> Burst anomaly may rack up <strong>₹${Math.round((abs / 100) * 6000)}+</strong>. Enable AWS WAF shielding immediately!` : `<strong>Dead Traffic:</strong> Check if your Lambda trigger (API Gateway, SQS, etc.) is misconfigured or completely inactive.`
+        });
     }
 
-    alerts.forEach(({ type, msg }) => {
+    alerts.forEach(a => {
         const div = document.createElement('div');
-        div.className = `opt-alert ${type}`;
-        div.innerHTML = `<span>${msg}</span>`;
+        div.style.cssText = `background: ${severities[a.sev].color}; border: 1px solid ${severities[a.sev].border}; border-radius: 10px; padding: 1rem 1.2rem;`;
+        div.innerHTML = `
+            <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.4rem;">
+                <span style="font-size:1rem;">${severities[a.sev].icon}</span>
+                <strong style="color:rgba(255,255,255,0.95); font-size:0.95rem;">${a.title}</strong>
+            </div>
+            <p style="margin:0 0 0.5rem; color:rgba(255,255,255,0.7); font-size:0.87rem; line-height:1.5;">${a.detail}</p>
+            <p style="margin:0; color:rgba(255,255,255,0.55); font-size:0.83rem; line-height:1.5;"><strong style="color:rgba(255,255,255,0.75);">Fix:</strong> ${a.fix}</p>
+        `;
         body.appendChild(div);
     });
 }
