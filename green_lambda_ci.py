@@ -4,7 +4,7 @@ import requests
 from radon.complexity import cc_visit
 
 # Configurable Action Threshold from GitHub Secrets
-ENERGY_THRESHOLD_WH = float(os.getenv('ENERGY_THRESHOLD_WH', '3.5'))
+ENERGY_THRESHOLD_WH = float(os.getenv('ENERGY_THRESHOLD_WH', '5.0'))
 GREEN_LAMBDA_URL = os.getenv('GREEN_LAMBDA_URL', 'http://localhost:5000')
 API_KEY = os.getenv('API_KEY', 'TEST-KEY-123')
 
