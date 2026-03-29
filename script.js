@@ -880,7 +880,7 @@ function initKPICounters() {
         { id: 'kpiEnergy', end: 0.85, dec: 2 },
         { id: 'kpiCost', end: 320, dec: 0 },
         { id: 'kpiCarbon', end: 0.6, dec: 1 },
-        { id: 'kpiAccuracy', end: 0.999, dec: 3 }
+        { id: 'kpiAccuracy', end: 0.9999, dec: 4 }
     ];
 
     const observer = new IntersectionObserver(entries => {
@@ -1089,9 +1089,9 @@ function initCharts() {
             data: {
                 labels: ['R² Score', 'MAE', 'RMSE', 'Train Speed', 'Inference', 'Interpretability'],
                 datasets: [
-                    { label: 'XGBoost', data: [99, 98, 96, 92, 95, 82], borderColor: '#c8ff00', backgroundColor: 'rgba(200,255,0,0.06)', borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#c8ff00' },
-                    { label: 'Random Forest', data: [99, 96, 98, 98, 90, 88], borderColor: '#36f9ae', backgroundColor: 'rgba(54,249,174,0.04)', borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#36f9ae' },
-                    { label: 'Neural Net', data: [97, 85, 85, 96, 72, 40], borderColor: '#7b61ff', backgroundColor: 'rgba(123,97,255,0.04)', borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#7b61ff' }
+                    { label: 'XGBoost', data: [99.99, 98, 96, 92, 95, 82], borderColor: '#c8ff00', backgroundColor: 'rgba(200,255,0,0.06)', borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#c8ff00' },
+                    { label: 'Random Forest', data: [99.99, 96, 98, 98, 90, 88], borderColor: '#36f9ae', backgroundColor: 'rgba(54,249,174,0.04)', borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#36f9ae' },
+                    { label: 'Neural Net', data: [99.73, 85, 85, 96, 72, 40], borderColor: '#7b61ff', backgroundColor: 'rgba(123,97,255,0.04)', borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#7b61ff' }
                 ]
             },
             options: {
@@ -1717,6 +1717,20 @@ async function initConnectPage() {
         }
 
         setSession(session);
+
+        // Save credentials to localStorage so runtime-test and other pages
+        // can make live CloudWatch calls directly.
+        if (mode === 'live') {
+            localStorage.setItem('gl_ak', payload.accessKeyId);
+            localStorage.setItem('gl_sk', payload.secretAccessKey);
+            if (payload.sessionToken) localStorage.setItem('gl_st', payload.sessionToken);
+            localStorage.setItem('gl_region', payload.region);
+            console.log('✅ AWS credentials saved to localStorage for live session.');
+        } else {
+            localStorage.removeItem('gl_ak');
+            localStorage.removeItem('gl_sk');
+            localStorage.removeItem('gl_st');
+        }
         if (instructionsInfo) instructionsInfo.style.display = 'none';
         wrap.hidden = false;
         renderFunctionList(functions, list, count);
@@ -2425,6 +2439,9 @@ function initLoginPage() {
                 if (isDummyEmail) {
                     loginStatus.textContent = "Presentation Override: Securely connecting Offline Mode...";
                     loginStatus.className = 'fc-status ok';
+                    localStorage.removeItem('greenlambda.session');
+                    localStorage.removeItem('greenlambda.analysis');
+                    localStorage.removeItem('greenlambda.forecast');
                     localStorage.setItem('green_lambda_demo_user', email);
                     setTimeout(() => window.location.href = 'index.html', 1200);
                     return;
@@ -2444,6 +2461,8 @@ function initLoginPage() {
                     // SECURE PURGE: Completely destroy any leftover caches from previous Demo sessions or alternate users
                     // so the new legitimate user gets a 100% clean profile.
                     localStorage.removeItem('greenlambda.session');
+                    localStorage.removeItem('greenlambda.analysis');
+                    localStorage.removeItem('greenlambda.forecast');
                     localStorage.removeItem('green_lambda_demo_user');
 
                     loginStatus.textContent = 'Success! Redirecting...';
@@ -2612,9 +2631,13 @@ async function checkAuthStatus() {
 
                     // Logout logic natively executed
                     document.getElementById('logoutBtnWrapper').addEventListener('click', async () => {
-                        // SECURE PURGE: Completely destroy ALL mock data and cached AWS telemetry
+                        // SECURE PURGE: Completely destroy ALL mock data, cached AWS telemetry and credentials
                         localStorage.removeItem('green_lambda_demo_user');
                         localStorage.removeItem('greenlambda.session');
+                        localStorage.removeItem('gl_ak');
+                        localStorage.removeItem('gl_sk');
+                        localStorage.removeItem('gl_st');
+                        localStorage.removeItem('gl_region');
 
                         // Destroy real Supabase session natively
                         if (window.supabaseClient) {

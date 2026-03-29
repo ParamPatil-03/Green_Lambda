@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Runtime Validation | Green Lambda</title>
+    <meta name="description" content="Validate ML prediction accuracy against actual measured energy." />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .badge {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-top: 1rem;
+        }
+        .badge.green {
+            background: rgba(46, 204, 113, 0.1);
+            color: #2ecc71;
+            border: 1px solid rgba(46, 204, 113, 0.3);
+        }
+        .badge.yellow {
+            background: rgba(241, 196, 15, 0.1);
+            color: #f1c40f;
+            border: 1px solid rgba(241, 196, 15, 0.3);
+        }
+        .verdict-green { color: #2ecc71 !important; }
+        .verdict-yellow { color: #f1c40f !important; }
+        .verdict-red { color: #e74c3c !important; }
+        /* ── Diagnostic Error Panel ── */
+        .diagnostic-panel {
+            margin-top: 1.5rem;
+            border-radius: 12px;
+            border: 1px solid rgba(231, 76, 60, 0.35);
+            background: rgba(231, 76, 60, 0.06);
+            padding: 1.5rem 1.75rem;
+            transition: opacity 0.4s ease, transform 0.4s ease;
+        }
+        .diagnostic-panel.warning {
+            border-color: rgba(241, 196, 15, 0.35);
+            background: rgba(241, 196, 15, 0.06);
+        }
+        .diagnostic-header { display: flex; align-items: flex-start; gap: 1rem; margin-bottom: 1rem; }
+        .diagnostic-icon { font-size: 2rem; line-height: 1; flex-shrink: 0; }
+        .diagnostic-title { font-size: 1.1rem; font-weight: 700; margin: 0 0 0.2rem 0; }
+        .diagnostic-subtitle { font-size: 0.85rem; color: rgba(255,255,255,0.45); margin: 0; }
+        .diagnostic-explanation { font-size: 0.92rem; color: rgba(255,255,255,0.72); line-height: 1.65; margin-bottom: 1.25rem; }
+        .diagnostic-fix { border-top: 1px solid rgba(255,255,255,0.08); padding-top: 1rem; }
+        .diagnostic-fix-label { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255,255,255,0.35); margin-bottom: 0.75rem; }
+        .diagnostic-fix-steps { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.55rem; }
+        .diagnostic-fix-steps li { display: flex; align-items: flex-start; gap: 0.6rem; font-size: 0.88rem; color: rgba(255,255,255,0.75); }
+        .diagnostic-fix-steps li::before { content: '→'; color: var(--accent); font-weight: 700; flex-shrink: 0; }
+    </style>
+</head>
+
+<body data-page="runtime">
+    <nav class="nav" id="nav">
+        <div class="nav-inner">
+            <a href="index.html" class="nav-logo">
+                <span class="logo-mark">⚡</span>
+                <span class="logo-text">Green Lambda</span>
+            </a>
+            <div class="nav-links" id="navLinks">
+                <a href="index.html" class="nav-link" data-section="home">
+                    <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                    </svg> Home
+                </a>
+                <a href="connect.html" class="nav-link" data-section="connect">
+                    <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="16 18 22 12 16 6"></polyline>
+                        <polyline points="8 6 2 12 8 18"></polyline>
+                    </svg> Connect AWS
+                </a>
+                <a href="analyze.html" class="nav-link" data-section="analyze">
+                    <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg> Analyze
+                </a>
+                <a href="dashboard.html" class="nav-link" data-section="dashboard">
+                    <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
+                    </svg> Live Dashboard
+                </a>
+                <a href="runtime-test.html" class="nav-link active">
+                    <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect>
+                        <rect x="9" y="9" width="6" height="6"></rect>
+                        <line x1="9" y1="1" x2="9" y2="4"></line>
+                        <line x1="15" y1="1" x2="15" y2="4"></line>
+                        <line x1="9" y1="20" x2="9" y2="23"></line>
+                        <line x1="15" y1="20" x2="15" y2="23"></line>
+                        <line x1="20" y1="9" x2="23" y2="9"></line>
+                        <line x1="20" y1="14" x2="23" y2="14"></line>
+                        <line x1="1" y1="9" x2="4" y2="9"></line>
+                        <line x1="1" y1="14" x2="4" y2="14"></line>
+                    </svg> Runtime Test
+                </a>
+            </div>
+            <button class="nav-toggle" id="navToggle" aria-label="Toggle menu">
+                <span></span><span></span><span></span>
+            </button>
+        </div>
+    </nav>
+
+    <div class="scroll-progress" id="scrollProgress"></div>
+
+    <main class="workflow-main section analyze-flow-main">
+        <div class="container">
+            <div class="workflow-shell reveal">
+                <span class="section-label">Step 4 — Runtime Validation</span>
+                <h1 class="section-title">Runtime Metrics & <em>Model Validation</em></h1>
+                <p class="section-subtitle">Collect real CloudWatch metrics from your deployed Lambda functions and validate ML prediction accuracy against actual measured energy.</p>
+
+                <div id="runtimeStatusBanner" class="status-banner" style="display:none;"></div>
+
+                <!-- Diagnostic Error Panel (shown automatically on AWS / backend errors) -->
+                <div id="diagnosticPanel" class="diagnostic-panel" style="display:none;">
+                    <div class="diagnostic-header">
+                        <span class="diagnostic-icon" id="diagnosticIcon">⚠️</span>
+                        <div>
+                            <h3 class="diagnostic-title" id="diagnosticTitle">Issue Detected</h3>
+                            <p class="diagnostic-subtitle" id="diagnosticSubtitle">Here's what went wrong and how to fix it</p>
+                        </div>
+                    </div>
+                    <p class="diagnostic-explanation" id="diagnosticExplanation"></p>
+                    <div class="diagnostic-fix" id="diagnosticFix"></div>
+                </div>
+
+                <form id="runtimeFunctionForm" class="workflow-form">
+                    <div class="form-group">
+                        <label class="form-label" for="runtimeFunctionSelect">Lambda Function</label>
+                        <select class="form-control" id="runtimeFunctionSelect" required>
+                            <option value="">Select a function...</option>
+                        </select>
+                    </div>
+
+                    <div class="workflow-actions">
+                        <button type="submit" class="btn btn-primary" id="collectRuntimeBtn">
+                            <span class="fold"></span>
+                            <div class="points_wrapper"><i class="point"></i><i class="point"></i><i class="point"></i><i class="point"></i><i class="point"></i><i class="point"></i><i class="point"></i><i class="point"></i><i class="point"></i><i class="point"></i></div>
+                            <span class="inner">
+                                <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5">
+                                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                                </svg> Collect Runtime Metrics
+                            </span>
+                        </button>
+                    </div>
+                </form>
+
+                <section id="runtimeResultsPanel" class="results-dashboard" style="display:none; margin-top:2.5rem;">
+                    <div class="flex-header">
+                        <h2 style="font-size:2rem; font-weight:800; letter-spacing:-0.03em;">CloudWatch Metrics — <span style="color:var(--accent);">Live Data</span></h2>
+                    </div>
+                    <div class="results-grid">
+                        <div class="result-card">
+                            <span class="result-label">Avg Duration</span>
+                            <div class="result-value" id="rtDuration">-- <span class="result-unit">ms</span></div>
+                        </div>
+                        <div class="result-card">
+                            <span class="result-label">Memory Used</span>
+                            <div class="result-value" id="rtMemory">-- <span class="result-unit">MB</span></div>
+                        </div>
+                        <div class="result-card">
+                            <span class="result-label">Invocations (24h)</span>
+                            <div class="result-value" id="rtInvocations">--</div>
+                        </div>
+                        <div class="result-card">
+                            <span class="result-label">Error Count</span>
+                            <div class="result-value" id="rtErrors">--</div>
+                        </div>
+                    </div>
+                    <div id="rtDataSourceBadge" class="badge"></div>
+                </section>
+
+                <section id="runtimeValidationPanel" class="results-dashboard" style="display:none; margin-top:2.5rem;">
+                    <div class="flex-header">
+                        <h2 style="font-size:2rem; font-weight:800; letter-spacing:-0.03em;">Energy Prediction <span style="color:var(--accent);">vs Actual</span></h2>
+                    </div>
+                    
+                    <div class="form-grid-2" style="margin-bottom: 1.5rem;">
+                        <div class="result-card primary">
+                            <span class="result-label">ML Predicted Energy</span>
+                            <div class="result-value" id="rtPredEnergy">-- <span class="result-unit">Wh</span></div>
+                            <span class="result-sub">XGBoost Model (R² = 0.9999)</span>
+                        </div>
+                        <div class="result-card">
+                            <span class="result-label">Actual Measured Energy</span>
+                            <div class="result-value" id="rtActualEnergy">-- <span class="result-unit">Wh</span></div>
+                            <span class="result-sub">Calculated from CloudWatch</span>
+                        </div>
+                    </div>
+
+                    <div class="results-grid">
+                        <div class="result-card">
+                            <span class="result-label">Absolute Error</span>
+                            <div class="result-value" id="rtAbsError">-- <span class="result-unit">Wh</span></div>
+                        </div>
+                        <div class="result-card">
+                            <span class="result-label">Model Accuracy</span>
+                            <div class="result-value" id="rtAccuracy">-- <span class="result-unit">%</span></div>
+                        </div>
+                        <div class="result-card">
+                            <span class="result-label">Verdict</span>
+                            <div class="result-value" id="rtVerdict">--</div>
+                        </div>
+                    </div>
+
+                    <div class="dash-card" style="margin-top:1.5rem;">
+                        <div class="dash-card-header">
+                            <h3>Predicted vs Actual Energy Comparison</h3>
+                        </div>
+                        <div class="chart-wrap" style="height: 300px;"><canvas id="rtCompareChart"></canvas></div>
+                    </div>
+                </section>
+
+                <section id="runtimeCarbonPanel" class="results-dashboard" style="display:none; margin-top:2.5rem;">
+                    <div class="flex-header">
+                        <h2 style="font-size:2rem; font-weight:800; letter-spacing:-0.03em;">Carbon Footprint <span style="color:var(--accent);">Impact</span></h2>
+                    </div>
+                    <div class="form-grid-2">
+                        <div class="result-card">
+                            <span class="result-label">Carbon per Invocation</span>
+                            <div class="result-value" id="rtCarbon">-- <span class="result-unit">gCO₂</span></div>
+                        </div>
+                        <div class="result-card">
+                            <span class="result-label">Monthly Carbon (est.)</span>
+                            <div class="result-value" id="rtMonthlyCarbon">-- <span class="result-unit">kg CO₂</span></div>
+                        </div>
+                    </div>
+                    </div>
+                </section>
+
+                <section id="scatterDataPanel" class="results-dashboard" style="margin-top:4rem;">
+                    <div class="flex-header">
+                        <div>
+                            <span class="section-label" style="display:block; margin-bottom:0.5rem; color:var(--accent); font-weight:700; font-size:0.85rem; letter-spacing:0.04em; text-transform:uppercase;">Proof of Accuracy</span>
+                            <h2 style="font-size:2rem; font-weight:800; letter-spacing:-0.03em;">Predicted vs <em style="color:var(--accent); font-style:normal;">Actual Energy</em></h2>
+                            <p class="section-subtitle" style="margin-top:0.5rem; max-width:800px;">60 real Lambda function measurements from our training dataset. Each point shows ML predicted vs actual measured energy.</p>
+                        </div>
+                    </div>
+
+                    <div class="dash-card" style="margin-top:1.5rem;">
+                        <div class="dash-card-header">
+                            <h3>XGBoost: Predicted vs Actual (R² = 0.9999)</h3>
+                        </div>
+                        <div class="chart-wrap" style="height: 400px; position:relative;">
+                            <canvas id="scatterChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="results-grid" style="margin-top:1.5rem;">
+                        <div class="result-card">
+                            <span class="result-label">R² Score</span>
+                            <div class="result-value" id="scatterR2">--</div>
+                        </div>
+                        <div class="result-card">
+                            <span class="result-label">MAE</span>
+                            <div class="result-value" id="scatterMae">-- <span class="result-unit">Wh</span></div>
+                        </div>
+                        <div class="result-card">
+                            <span class="result-label">Data Points</span>
+                            <div class="result-value" id="scatterCount">--</div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="footer-inner">
+            <div class="footer-left">
+                <span class="footer-brand">⚡ Green Lambda</span>
+                <span class="footer-copy">© 2026 Green Lambda. All rights reserved.</span>
+            </div>
+            <div class="footer-right">
+                <span>Runtime Metrics Validation</span>
+                <span class="footer-sep">|</span>
+                <span>Mini Project — SEM 4</span>
+            </div>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/simplex-noise/2.4.0/simplex-noise.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+    <!-- Supabase Logic -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabaseClient.js"></script>
+    <script src="script.js"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const selectEl = document.getElementById('runtimeFunctionSelect');
+
+            // Read from the correct session key used by connect.html / script.js
+            let session = null;
+            try {
+                const raw = localStorage.getItem('greenlambda.session');
+                if (raw) session = JSON.parse(raw);
+            } catch (e) { session = null; }
+
+            const demoUser = localStorage.getItem('green_lambda_demo_user');
+            const hasSession = session && session.functions && session.functions.length > 0;
+
+            const demoFns = [
+                { name: 'bubble-sort', runtime: 'python3.11' },
+                { name: 'fibonacci', runtime: 'python3.11' },
+                { name: 'matrix-multiply', runtime: 'python3.11' },
+                { name: 'prime-calculator', runtime: 'python3.11' },
+                { name: 'simple-encryption', runtime: 'nodejs20.x' },
+                { name: 'api-fetcher', runtime: 'nodejs20.x' },
+                { name: 'csv-processor', runtime: 'python3.11' },
+                { name: 'file-reader', runtime: 'python3.11' },
+                { name: 'json-parser', runtime: 'nodejs20.x' },
+                { name: 'image-resizer', runtime: 'python3.11' }
+            ];
+
+            // No session AND no demo user = not connected at all
+            if (!hasSession && !demoUser) {
+                const banner = document.getElementById('runtimeStatusBanner');
+                banner.style.display = 'block';
+                banner.className = 'status-banner error';
+                banner.innerHTML = `<span>⚠️ AWS Account is not connected. <a href="connect.html" style="color:white;text-decoration:underline;">Click here to connect</a>.</span>`;
+
+                const btn = document.getElementById('collectRuntimeBtn');
+                btn.disabled = true;
+                btn.style.opacity = '0.5';
+                btn.style.cursor = 'not-allowed';
+                selectEl.disabled = true;
+                return;
+            }
+
+            // Populate dropdown from real session functions, or fall back to demo list
+            const functionsToLoad = hasSession ? session.functions : demoFns;
+            functionsToLoad.forEach(fn => {
+                const opt = document.createElement('option');
+                opt.value = fn.name;
+                opt.textContent = fn.runtime ? `${fn.name} (${fn.runtime})` : fn.name;
+                selectEl.appendChild(opt);
+            });
+
+            // Show a friendly info banner if demo mode
+            if (!hasSession && demoUser) {
+                const banner = document.getElementById('runtimeStatusBanner');
+                banner.style.display = 'block';
+                banner.className = 'status-banner show info';
+                banner.innerHTML = `<span>⚡ Demo Mode — Showing simulated Lambda functions. <a href="connect.html" style="color:var(--primary);text-decoration:underline;">Connect real AWS</a> for live metrics.</span>`;
+            }
+
+            let compareChartInstance = null;
+
+            // Accurate demo data derived from actual ML training dataset values
+            const DEMO_METRICS = {
+                'bubble-sort':       { duration: 2890,  memory: 98,  invocations: 12400, errors: 2,  pred: 0.3940, actual: 0.3961, accuracy: 99.47 },
+                'fibonacci':         { duration: 1860,  memory: 142, invocations: 48700, errors: 0,  pred: 1.0810, actual: 1.0834, accuracy: 99.78 },
+                'matrix-multiply':   { duration: 520,   memory: 312, invocations: 8100,  errors: 5,  pred: 1.5330, actual: 1.5297, accuracy: 99.78 },
+                'prime-calculator':  { duration: 380,   memory: 128, invocations: 67200, errors: 1,  pred: 1.8220, actual: 1.8195, accuracy: 99.86 },
+                'simple-encryption': { duration: 62,    memory: 54,  invocations: 18000, errors: 0,  pred: 2.0690, actual: 2.0712, accuracy: 99.89 },
+                'api-fetcher':       { duration: 410,   memory: 198, invocations: 23400, errors: 3,  pred: 2.3370, actual: 2.3341, accuracy: 99.88 },
+                'csv-processor':     { duration: 185,   memory: 96,  invocations: 5600,  errors: 1,  pred: 2.7110, actual: 2.7138, accuracy: 99.90 },
+                'file-reader':       { duration: 210,   memory: 178, invocations: 9300,  errors: 0,  pred: 3.0240, actual: 3.0262, accuracy: 99.93 },
+                'json-parser':       { duration: 108,   memory: 72,  invocations: 31500, errors: 0,  pred: 3.2710, actual: 3.2694, accuracy: 99.95 },
+                'image-resizer':     { duration: 740,   memory: 486, invocations: 7200,  errors: 4,  pred: 1.6400, actual: 1.6423, accuracy: 99.86 }
+            };
+
+            document.getElementById('runtimeFunctionForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const btn = document.getElementById('collectRuntimeBtn');
+                const banner = document.getElementById('runtimeStatusBanner');
+                const fnName = selectEl.value;
+
+                if (!fnName) return;
+                hideDiagnostic(); // Clear any previous diagnostic on new submission
+
+                btn.style.opacity = '0.7';
+                btn.style.pointerEvents = 'none';
+                banner.style.display = 'block';
+                banner.className = 'status-banner info';
+                banner.innerHTML = `<span>⚡ Collecting CloudWatch metrics for <strong>${fnName}</strong>...</span>`;
+
+                // Read credentials saved to localStorage at connect time
+                const ak = localStorage.getItem('gl_ak');
+                const sk = localStorage.getItem('gl_sk');
+                const st = localStorage.getItem('gl_st') || null;
+                const region = localStorage.getItem('gl_region') || session?.region || 'ap-south-1';
+
+                // Debug: log what we have
+                console.log('[Runtime Test] ak:', ak ? 'SET ✅' : 'MISSING ❌');
+                console.log('[Runtime Test] sk:', sk ? 'SET ✅' : 'MISSING ❌');
+                console.log('[Runtime Test] region:', region);
+                console.log('[Runtime Test] session.mode:', session?.mode);
+
+                // isDemo only if no real credentials in localStorage
+                const isDemo = !ak || !sk;
+
+                try {
+                    let data;
+
+                    if (!isDemo) {
+                        // Real account: send credentials directly to backend
+                        const res = await fetch('http://localhost:5000/collect-runtime-metrics', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                accessKeyId: ak,
+                                secretAccessKey: sk,
+                                sessionToken: st,
+                                region,
+                                functionName: fnName
+                            })
+                        });
+                        data = await res.json();
+                        if (!res.ok) throw new Error(data.error || 'Failed to collect metrics');
+                    } else {
+                        // Demo / backend unavailable: serve frontend dataset table instantly
+                        await new Promise(r => setTimeout(r, 1100)); // Simulate slight loading delay
+                        const m = DEMO_METRICS[fnName] || { duration: 250, memory: 128, invocations: 5000, errors: 1, pred: 1.5, actual: 1.502, accuracy: 99.87 };
+                        const absErr = parseFloat(Math.abs(m.pred - m.actual).toFixed(4));
+                        const carbonGco2 = parseFloat(((m.actual / 1000) * 708000).toFixed(4));
+                        data = {
+                            functionName: fnName,
+                            dataSource: 'demo_fallback',
+                            cloudwatch: { avgDurationMs: m.duration, maxMemoryUsedMb: m.memory, invocationCount: m.invocations, errorCount: m.errors },
+                            actualEnergy: { energyWhPerInvocation: m.actual, carbonGco2PerInvocation: carbonGco2, powerWatts: parseFloat((10 + 0.2 * m.memory).toFixed(2)) },
+                            mlPrediction: { energyWhPerInvocation: m.pred, confidence: 0.9999 },
+                            validation: { absoluteErrorWh: absErr, accuracyPercent: m.accuracy, verdict: m.accuracy >= 99 ? 'Excellent' : m.accuracy >= 90 ? 'Good' : 'Needs Review' }
+                        };
+                    }
+
+                    // Populate UI
+                    document.getElementById('rtDuration').innerHTML = `${data.cloudwatch.avgDurationMs} <span class="result-unit">ms</span>`;
+                    document.getElementById('rtMemory').innerHTML = `${data.cloudwatch.maxMemoryUsedMb} <span class="result-unit">MB</span>`;
+                    document.getElementById('rtInvocations').textContent = data.cloudwatch.invocationCount;
+                    document.getElementById('rtErrors').textContent = data.cloudwatch.errorCount;
+
+                    const badge = document.getElementById('rtDataSourceBadge');
+                    if (data.dataSource === 'live_aws') {
+                        badge.className = 'badge green';
+                        badge.textContent = '✅ Live AWS Data';
+                    } else if (data.dataSource === 'live_aws_no_data') {
+                        badge.className = 'badge blue';
+                        badge.textContent = '📡 Live AWS (No Recent Invocations)';
+                    } else if (data.dataSource === 'live_aws_error') {
+                        badge.className = 'badge orange';
+                        badge.textContent = '⚠️ Live AWS (CloudWatch Error)';
+                        showDiagnostic('cloudwatch_error'); // Auto-explain the CloudWatch issue
+                    } else {
+                        badge.className = 'badge yellow';
+                        badge.textContent = '⚡ Demo Mode';
+                    }
+
+                    document.getElementById('rtPredEnergy').innerHTML = `${data.mlPrediction.energyWhPerInvocation} <span class="result-unit">Wh</span>`;
+                    document.getElementById('rtActualEnergy').innerHTML = `${data.actualEnergy.energyWhPerInvocation} <span class="result-unit">Wh</span>`;
+                    
+                    document.getElementById('rtAbsError').innerHTML = `${data.validation.absoluteErrorWh} <span class="result-unit">Wh</span>`;
+                    document.getElementById('rtAccuracy').innerHTML = `${data.validation.accuracyPercent} <span class="result-unit">%</span>`;
+                    
+                    const verdictEl = document.getElementById('rtVerdict');
+                    verdictEl.textContent = data.validation.verdict;
+                    verdictEl.className = 'result-value'; // Reset
+                    if (data.validation.verdict === 'Excellent') verdictEl.classList.add('verdict-green');
+                    else if (data.validation.verdict === 'Good') verdictEl.classList.add('verdict-yellow');
+                    else verdictEl.classList.add('verdict-red');
+
+                    document.getElementById('rtCarbon').innerHTML = `${data.actualEnergy.carbonGco2PerInvocation} <span class="result-unit">gCO₂</span>`;
+                    const monthlyCarbon = (data.actualEnergy.carbonGco2PerInvocation * data.cloudwatch.invocationCount * 30 / 1000).toFixed(4); // from g to kg
+                    document.getElementById('rtMonthlyCarbon').innerHTML = `${monthlyCarbon} <span class="result-unit">kg CO₂</span>`;
+
+                    // Show panels
+                    gsap.to(['#runtimeResultsPanel', '#runtimeValidationPanel', '#runtimeCarbonPanel'], {
+                        display: 'block',
+                        opacity: 1,
+                        y: 0,
+                        duration: 0.8,
+                        stagger: 0.1,
+                        ease: "power3.out",
+                        onStart: () => {
+                            document.querySelectorAll('#runtimeResultsPanel, #runtimeValidationPanel, #runtimeCarbonPanel').forEach(el => {
+                                el.style.opacity = '0';
+                                el.style.transform = 'translateY(20px)';
+                                el.style.display = 'block';
+                            });
+                        }
+                    });
+
+                    // Update Chart
+                    updateCompareChart(data.functionName, data.mlPrediction.energyWhPerInvocation, data.actualEnergy.energyWhPerInvocation);
+
+                    banner.className = 'status-banner success';
+                    banner.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg> <span>Validation Complete</span>`;
+                } catch (err) {
+                    banner.className = 'status-banner error';
+                    banner.innerHTML = '<span>Error: ' + err.message + '</span>';
+                    // Detect error type and show human-readable diagnostic
+                    const msg = (err.message || '').toLowerCase();
+                    if (err instanceof TypeError || msg.includes('failed to fetch') || msg.includes('networkerror') || msg.includes('load failed')) {
+                        showDiagnostic('network_error');
+                    } else if (msg.includes('accessdenied') || msg.includes('access denied') || msg.includes('not authorized')) {
+                        showDiagnostic('access_denied');
+                    } else if (msg.includes('resourcenotfound') || msg.includes('function not found') || msg.includes('does not exist')) {
+                        showDiagnostic('not_found');
+                    } else if (msg.includes('timeout') || msg.includes('timed out')) {
+                        showDiagnostic('timeout');
+                    } else if (msg.includes('importmodule') || msg.includes('import module') || msg.includes('no module named')) {
+                        showDiagnostic('import_error');
+                    } else {
+                        showDiagnostic('generic', err.message);
+                    }
+                } finally {
+                    btn.style.opacity = '1';
+                    btn.style.pointerEvents = 'auto';
+                }
+            });
+
+            function updateCompareChart(label, pred, actual) {
+                const ctx = document.getElementById('rtCompareChart').getContext('2d');
+                if (compareChartInstance) compareChartInstance.destroy();
+
+                compareChartInstance = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: [label],
+                        datasets: [
+                            {
+                                label: 'ML Predicted Energy (Wh)',
+                                data: [pred],
+                                backgroundColor: 'rgba(46, 204, 113, 0.9)', // accent green
+                                borderWidth: 0,
+                                borderRadius: 4,
+                                barPercentage: 0.5,
+                                categoryPercentage: 0.8
+                            },
+                            {
+                                label: 'Actual Measured Energy (Wh)',
+                                data: [actual],
+                                backgroundColor: 'rgba(52, 152, 219, 0.9)', // blue
+                                borderWidth: 0,
+                                borderRadius: 4,
+                                barPercentage: 0.5,
+                                categoryPercentage: 0.8
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                labels: { color: 'rgba(255,255,255,0.7)', font: { family: 'Inter', size: 12 } }
+                            },
+                            tooltip: {
+                                backgroundColor: 'rgba(10,12,16,0.9)',
+                                titleColor: 'rgba(255,255,255,0.9)',
+                                bodyColor: 'rgba(255,255,255,0.7)',
+                                borderColor: 'rgba(255,255,255,0.1)',
+                                borderWidth: 1,
+                                padding: 12,
+                                displayColors: true
+                            }
+                        },
+                        scales: {
+                            y: {
+                                grid: { color: 'rgba(255,255,255,0.05)', drawBorder: false },
+                                ticks: { color: 'rgba(255,255,255,0.5)', font: { family: 'JetBrains Mono' } },
+                                title: { display: true, text: 'Energy (Wh)', color: 'rgba(255,255,255,0.5)', font: { family: 'Inter', size: 12 } }
+                            },
+                            x: {
+                                grid: { display: false, drawBorder: false },
+                                ticks: { color: 'rgba(255,255,255,0.7)', font: { family: 'Inter', size: 13 } }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // ───── Diagnostic Helper Functions ─────
+            const DIAGNOSTICS = {
+                cloudwatch_error: {
+                    icon: '⚠️', warning: true,
+                    title: 'CloudWatch Metrics Unavailable',
+                    subtitle: 'AWS was reached, but metrics could not be fetched',
+                    explanation: 'Your AWS credentials are valid and the connection succeeded, but CloudWatch could not return metrics for this function. This usually means the function has never been invoked in the past 24 hours, or the IAM policy is missing CloudWatch read access.',
+                    steps: [
+                        'Invoke the function at least once from the AWS Console — CloudWatch needs at least one execution to show data',
+                        'Ensure your IAM user has the cloudwatch:GetMetricStatistics permission',
+                        'Confirm the selected AWS region matches where the function is actually deployed',
+                        'Wait 1–2 minutes after invoking — CloudWatch metrics are not instant'
+                    ]
+                },
+                network_error: {
+                    icon: '🔌', warning: false,
+                    title: 'Cannot Reach Backend Server',
+                    subtitle: 'The GreenLambda Flask backend is not responding',
+                    explanation: 'The page could not connect to http://localhost:5000. The Python/Flask backend is either not running, has crashed, or port 5000 is blocked on this machine.',
+                    steps: [
+                        'Open a terminal, navigate to the backend folder, and run: python app.py',
+                        'Check that port 5000 is not already in use by another application',
+                        'Look at the terminal output for any Python import or startup errors',
+                        'Restart the backend server and click Collect Runtime Metrics again — no page refresh needed'
+                    ]
+                },
+                access_denied: {
+                    icon: '🔒', warning: false,
+                    title: 'AWS Access Denied',
+                    subtitle: 'Your credentials lack the required permissions',
+                    explanation: 'AWS rejected the request because your IAM user or role does not have sufficient permissions. GreenLambda needs read access to Lambda and CloudWatch to collect metrics.',
+                    steps: [
+                        'Open the AWS IAM Console and check your user\'s attached policies',
+                        'Attach the managed policies: AWSLambdaReadOnlyAccess and CloudWatchReadOnlyAccess',
+                        'If using a custom policy, add: lambda:ListFunctions and cloudwatch:GetMetricStatistics',
+                        'Re-connect your AWS account on the Connect page after updating permissions'
+                    ]
+                },
+                not_found: {
+                    icon: '🔍', warning: false,
+                    title: 'Lambda Function Not Found',
+                    subtitle: 'The selected function does not exist in this region',
+                    explanation: 'AWS could not locate this Lambda function. It may have been deleted, renamed, or it exists in a different AWS region than the one configured when you connected.',
+                    steps: [
+                        'Verify the function still exists in the AWS Lambda Console',
+                        'Confirm the correct region is configured on the Connect page',
+                        'Re-connect your AWS account to refresh the list of available functions',
+                        'The function may have been renamed — select the correct one from the dropdown'
+                    ]
+                },
+                timeout: {
+                    icon: '⏱️', warning: false,
+                    title: 'Lambda Function Timed Out',
+                    subtitle: 'The function exceeded its configured execution time limit',
+                    explanation: 'The function ran longer than its timeout setting allows. This usually means the function is stuck, waiting on a slow external service, or the timeout is set too low for the amount of work it does.',
+                    steps: [
+                        'Increase the function timeout in AWS Lambda → Configuration → General configuration (max: 15 minutes)',
+                        'Check if the function is waiting on a slow API, database, or external network call',
+                        'Review the function code for blocking operations or infinite loops',
+                        'Open CloudWatch Logs in the AWS Console to see exactly where execution stopped'
+                    ]
+                },
+                import_error: {
+                    icon: '📦', warning: false,
+                    title: 'Missing Dependency / Import Error',
+                    subtitle: 'The function could not load a required module or package',
+                    explanation: 'The Lambda function crashed at startup because a required library is missing from the deployment package. This happens when packages are not bundled alongside the function code before deployment.',
+                    steps: [
+                        'For Python: run pip install -r requirements.txt -t . inside the function folder, then re-zip and re-deploy',
+                        'For Node.js: include the node_modules folder inside your deployment zip',
+                        'Consider using AWS Lambda Layers to manage shared dependencies across multiple functions',
+                        'Check CloudWatch Logs for the exact missing module name'
+                    ]
+                },
+                generic: {
+                    icon: '❌', warning: false,
+                    title: 'An Unexpected Error Occurred',
+                    subtitle: 'Something went wrong during metric collection',
+                    explanation: null,
+                    steps: [
+                        'Open browser DevTools (F12) → Console tab for full error details',
+                        'Make sure the backend server is running at http://localhost:5000',
+                        'Check that your AWS credentials have not expired — reconnect if needed',
+                        'Try disconnecting and re-connecting your AWS account on the Connect page'
+                    ]
+                }
+            };
+
+            function showDiagnostic(type, rawErrorMsg) {
+                const d = DIAGNOSTICS[type] || DIAGNOSTICS.generic;
+                const panel = document.getElementById('diagnosticPanel');
+                document.getElementById('diagnosticIcon').textContent = d.icon;
+                const titleEl = document.getElementById('diagnosticTitle');
+                titleEl.textContent = d.title;
+                titleEl.style.color = d.warning ? '#f1c40f' : '#e74c3c';
+                document.getElementById('diagnosticSubtitle').textContent = d.subtitle;
+                const explanation = (type === 'generic' && rawErrorMsg)
+                    ? 'Error details: ' + rawErrorMsg
+                    : (d.explanation || rawErrorMsg || 'An unexpected error occurred.');
+                document.getElementById('diagnosticExplanation').textContent = explanation;
+                document.getElementById('diagnosticFix').innerHTML =
+                    '<div class="diagnostic-fix-label">How to fix it</div>' +
+                    '<ul class="diagnostic-fix-steps">' +
+                    d.steps.map(s => '<li>' + s + '</li>').join('') +
+                    '</ul>';
+                panel.className = 'diagnostic-panel' + (d.warning ? ' warning' : '');
+                panel.style.display = 'block';
+                panel.style.opacity = '0';
+                panel.style.transform = 'translateY(10px)';
+                requestAnimationFrame(() => {
+                    panel.style.opacity = '1';
+                    panel.style.transform = 'translateY(0)';
+                });
+                panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+
+            function hideDiagnostic() {
+                const panel = document.getElementById('diagnosticPanel');
+                panel.style.display = 'none';
+                panel.style.opacity = '0';
+                panel.style.transition = '';
+            }
+            // ───── End Diagnostic Helpers ─────
+
+            // Fetch Scatter Data and render Chart.js Scatter Plot automatically
+            async function loadScatterData() {
+                try {
+                    const res = await fetch('http://localhost:5000/scatter-data');
+                    if (!res.ok) throw new Error('Network response was not ok');
+                    const data = await res.json();
+                    
+                    document.getElementById('scatterR2').textContent = data.r2;
+                    document.getElementById('scatterMae').innerHTML = `${data.mae} <span class="result-unit">Wh</span>`;
+                    document.getElementById('scatterCount').textContent = data.points.length;
+
+                    const ctx = document.getElementById('scatterChart').getContext('2d');
+                    const scatterData = data.points.map(p => ({ x: p.actual, y: p.predicted }));
+                    
+                    // compute min/max for ideal diagonal reference line
+                    const maxVal = Math.max(...data.points.map(p => Math.max(p.actual, p.predicted))) * 1.05;
+                    
+                    new Chart(ctx, {
+                        type: 'scatter',
+                        data: {
+                            datasets: [
+                                {
+                                    label: 'Predicted vs Actual',
+                                    data: scatterData,
+                                    backgroundColor: 'rgba(204, 255, 0, 0.8)', // var(--accent)
+                                    borderColor: 'rgba(204, 255, 0, 1)',
+                                    pointRadius: 6,
+                                    pointHoverRadius: 8
+                                },
+                                {
+                                    label: 'Ideal Prediction (y=x)',
+                                    data: [{x: 0, y: 0}, {x: maxVal, y: maxVal}],
+                                    type: 'line',
+                                    borderColor: 'rgba(255, 255, 255, 0.2)', // grey line
+                                    borderWidth: 2,
+                                    borderDash: [5, 5],
+                                    pointRadius: 0,
+                                    fill: false
+                                }
+                            ]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    labels: { color: 'rgba(255,255,255,0.7)', font: { family: 'Inter', size: 12 } }
+                                },
+                                tooltip: {
+                                    backgroundColor: 'rgba(10,12,16,0.9)',
+                                    titleColor: 'rgba(255,255,255,0.9)',
+                                    bodyColor: 'rgba(255,255,255,0.7)',
+                                    borderColor: 'rgba(255,255,255,0.1)',
+                                    borderWidth: 1,
+                                    padding: 12,
+                                    callbacks: {
+                                        label: function(context) {
+                                            return `Actual: ${context.parsed.x} Wh, Pred: ${context.parsed.y} Wh`;
+                                        }
+                                    }
+                                }
+                            },
+                            scales: {
+                                x: {
+                                    type: 'linear',
+                                    position: 'bottom',
+                                    title: { display: true, text: 'Actual Energy (Wh)', color: 'rgba(255,255,255,0.5)', font: { family: 'Inter', size: 13 } },
+                                    grid: { color: 'rgba(255,255,255,0.05)', drawBorder: false },
+                                    ticks: { color: 'rgba(255,255,255,0.5)', font: { family: 'JetBrains Mono' } },
+                                    min: 0,
+                                    max: maxVal
+                                },
+                                y: {
+                                    title: { display: true, text: 'Predicted Energy (Wh)', color: 'rgba(255,255,255,0.5)', font: { family: 'Inter', size: 13 } },
+                                    grid: { color: 'rgba(255,255,255,0.05)', drawBorder: false },
+                                    ticks: { color: 'rgba(255,255,255,0.5)', font: { family: 'JetBrains Mono' } },
+                                    min: 0,
+                                    max: maxVal
+                                }
+                            }
+                        }
+                    });
+                } catch (e) {
+                    console.error('Failed to load scatter data:', e);
+                }
+            }
+
+            // Execute initially
+            loadScatterData();
+        });
+    </script>
+</body>
+
+</html>
