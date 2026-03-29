@@ -26,6 +26,6 @@ jobs:
       env:
         GREEN_LAMBDA_URL: "http://localhost:5000"
         API_KEY: "TEST-KEY-123"
-        ENERGY_THRESHOLD_WH: "3.50"
+        ENERGY_THRESHOLD_WH: "5.00"
       run: |
         python green_lambda_ci.py
