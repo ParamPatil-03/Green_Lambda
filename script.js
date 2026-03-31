@@ -1289,7 +1289,7 @@ async function apiRequest(path, options = {}) {
         const response = await fetch(`${getApiBase()}${path}`, req);
         const payload = await response.json().catch(() => ({}));
         if (!response.ok) {
-            throw new Error(payload.message || `Request failed (${response.status})`);
+            throw new Error(payload.error || payload.message || `Request failed (${response.status})`);
         }
         return payload;
     } finally {
@@ -1659,9 +1659,23 @@ async function initConnectPage() {
         try {
             response = await apiRequest('/connect-aws', { method: 'POST', body: payload });
         } catch (error) {
+            // Distinguish between backend being offline vs AWS rejecting credentials
+            const isNetworkError = error.message?.includes('Failed to fetch') ||
+                                   error.message?.includes('NetworkError') ||
+                                   error.message?.includes('net::ERR') ||
+                                   error.name === 'AbortError';
+
+            if (!isNetworkError) {
+                // Backend is running but AWS rejected the credentials — show real error
+                setBanner(status, 'error', `AWS Connection Failed: ${error.message}. Please check your credentials and try again.`);
+                connectBtn.disabled = false;
+                return;
+            }
+
+            // Backend is offline — fall to demo with a clear warning
             mode = 'demo';
             response = createDemoConnection(payload.region);
-            setBanner(status, 'ok', `Simulation Mode Active: Securely loading demonstration AWS connections.`);
+            setBanner(status, 'warn', `⚠️ Backend server is offline (could not reach http://127.0.0.1:5000). Running in Simulation Mode. Start the Flask backend to use real AWS credentials.`);
         }
 
         const functions = normalizeFunctions(response.functions || response.lambdaFunctions || []);
@@ -2592,9 +2606,7 @@ async function checkAuthStatus() {
                         <div style="font-size: 0.8rem; color: #888;">Signed in as</div>
                         <div style="font-size: 0.9rem; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${activeUserEmail}</div>
                     </div>
-                    <a href="connect.html" style="padding: 12px 16px; text-decoration: none; color: #e0e0e0; font-size: 0.9rem; transition: background 0.2s;">
-                        ⚡ Dashboard
-                    </a>
+
                     <div id="logoutBtnWrapper" style="padding: 12px 16px; border-top: 1px solid rgba(255,255,255,0.05); color: #ff4a4a; font-size: 0.9rem; cursor: pointer; transition: background 0.2s;">
                         🚪 Log Out
                     </div>

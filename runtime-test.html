@@ -55,6 +55,55 @@
         .diagnostic-fix-steps { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.55rem; }
         .diagnostic-fix-steps li { display: flex; align-items: flex-start; gap: 0.6rem; font-size: 0.88rem; color: rgba(255,255,255,0.75); }
         .diagnostic-fix-steps li::before { content: '→'; color: var(--accent); font-weight: 700; flex-shrink: 0; }
+
+        /* Loader Animation */
+        .loader-container {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            margin: 4rem 0 2rem 0;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .loader-spinner {
+            width: 64px;
+            height: 64px;
+            margin-bottom: 1.5rem;
+            animation: spin 2s linear infinite;
+        }
+        .loader-spinner circle {
+            stroke: var(--accent);
+            stroke-width: 4;
+            stroke-dasharray: 1, 200;
+            stroke-dashoffset: 0;
+            animation: dash 1.5s ease-in-out infinite, color-shift 6s ease-in-out infinite;
+            stroke-linecap: round;
+            fill: none;
+        }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+        @keyframes dash {
+            0% { stroke-dasharray: 1, 200; stroke-dashoffset: 0; }
+            50% { stroke-dasharray: 90, 200; stroke-dashoffset: -35px; }
+            100% { stroke-dasharray: 90, 200; stroke-dashoffset: -124px; }
+        }
+        @keyframes color-shift {
+            0%, 100% { stroke: #ebff38; }
+            50% { stroke: #2ecc71; }
+        }
+        .loader-text {
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--accent);
+            font-size: 0.95rem;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            animation: pulse-op 1.5s infinite ease-in-out;
+            font-weight: 600;
+        }
+        @keyframes pulse-op {
+            0%, 100% { opacity: 0.6; }
+            50% { opacity: 1; }
+        }
     </style>
 </head>
 
@@ -153,6 +202,14 @@
                         </button>
                     </div>
                 </form>
+
+                <!-- Awesome Loading Animation -->
+                <div id="awesomeLoader" class="loader-container">
+                    <svg class="loader-spinner" viewBox="25 25 50 50">
+                        <circle cx="50" cy="50" r="20"></circle>
+                    </svg>
+                    <div class="loader-text" id="loadingMessage">Initializing secure connection...</div>
+                </div>
 
                 <section id="runtimeResultsPanel" class="results-dashboard" style="display:none; margin-top:2.5rem;">
                     <div class="flex-header">
@@ -382,6 +439,32 @@
 
                 btn.style.opacity = '0.7';
                 btn.style.pointerEvents = 'none';
+
+                // Hide panels if they were already showing
+                gsap.set(['#runtimeResultsPanel', '#runtimeValidationPanel', '#runtimeCarbonPanel'], { display: 'none' });
+
+                // Show loader with animation
+                const loader = document.getElementById('awesomeLoader');
+                const msgEl = document.getElementById('loadingMessage');
+                loader.style.display = 'flex';
+                void loader.offsetWidth; // force reflow for transition
+                loader.style.opacity = '1';
+                msgEl.textContent = 'Initializing secure connection...';
+
+                // Set up dynamically changing message
+                const msgs = [
+                    'Querying AWS CloudWatch logs...',
+                    'Fetching invocation metrics...',
+                    'Applying XGBoost ML model...',
+                    'Calculating carbon footprint...'
+                ];
+                let msgIdx = 0;
+                window.loaderMsgInterval = setInterval(() => {
+                    if (msgIdx < msgs.length) {
+                        msgEl.textContent = msgs[msgIdx++];
+                    }
+                }, 1200);
+
                 banner.style.display = 'block';
                 banner.className = 'status-banner info';
                 banner.innerHTML = `<span>⚡ Collecting CloudWatch metrics for <strong>${fnName}</strong>...</span>`;
@@ -403,10 +486,14 @@
 
                 try {
                     let data;
+                    
+                    // Enforce a minimum display time for the cool loading animation
+                    const minWait = new Promise(resolve => setTimeout(resolve, 2500));
+                    let fetchPromise;
 
                     if (!isDemo) {
                         // Real account: send credentials directly to backend
-                        const res = await fetch('http://localhost:5000/collect-runtime-metrics', {
+                        fetchPromise = fetch('http://localhost:5000/collect-runtime-metrics', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
@@ -416,24 +503,31 @@
                                 region,
                                 functionName: fnName
                             })
+                        }).then(async (res) => {
+                            const d = await res.json();
+                            if (!res.ok) throw new Error(d.error || 'Failed to collect metrics');
+                            return d;
                         });
-                        data = await res.json();
-                        if (!res.ok) throw new Error(data.error || 'Failed to collect metrics');
                     } else {
-                        // Demo / backend unavailable: serve frontend dataset table instantly
-                        await new Promise(r => setTimeout(r, 1100)); // Simulate slight loading delay
-                        const m = DEMO_METRICS[fnName] || { duration: 250, memory: 128, invocations: 5000, errors: 1, pred: 1.5, actual: 1.502, accuracy: 99.87 };
-                        const absErr = parseFloat(Math.abs(m.pred - m.actual).toFixed(4));
-                        const carbonGco2 = parseFloat(((m.actual / 1000) * 708000).toFixed(4));
-                        data = {
-                            functionName: fnName,
-                            dataSource: 'demo_fallback',
-                            cloudwatch: { avgDurationMs: m.duration, maxMemoryUsedMb: m.memory, invocationCount: m.invocations, errorCount: m.errors },
-                            actualEnergy: { energyWhPerInvocation: m.actual, carbonGco2PerInvocation: carbonGco2, powerWatts: parseFloat((10 + 0.2 * m.memory).toFixed(2)) },
-                            mlPrediction: { energyWhPerInvocation: m.pred, confidence: 0.9999 },
-                            validation: { absoluteErrorWh: absErr, accuracyPercent: m.accuracy, verdict: m.accuracy >= 99 ? 'Excellent' : m.accuracy >= 90 ? 'Good' : 'Needs Review' }
-                        };
+                        // Demo / backend unavailable
+                        fetchPromise = new Promise(resolve => {
+                            const m = DEMO_METRICS[fnName] || { duration: 250, memory: 128, invocations: 5000, errors: 1, pred: 1.5, actual: 1.502, accuracy: 99.87 };
+                            const absErr = parseFloat(Math.abs(m.pred - m.actual).toFixed(4));
+                            const carbonGco2 = parseFloat(((m.actual / 1000) * 708000).toFixed(4));
+                            resolve({
+                                functionName: fnName,
+                                dataSource: 'demo_fallback',
+                                cloudwatch: { avgDurationMs: m.duration, maxMemoryUsedMb: m.memory, invocationCount: m.invocations, errorCount: m.errors },
+                                actualEnergy: { energyWhPerInvocation: m.actual, carbonGco2PerInvocation: carbonGco2, powerWatts: parseFloat((10 + 0.2 * m.memory).toFixed(2)) },
+                                mlPrediction: { energyWhPerInvocation: m.pred, confidence: 0.9999 },
+                                validation: { absoluteErrorWh: absErr, accuracyPercent: m.accuracy, verdict: m.accuracy >= 99 ? 'Excellent' : m.accuracy >= 90 ? 'Good' : 'Needs Review' }
+                            });
+                        });
                     }
+
+                    // Await both the fetch and the minimum wait time so animation plays fully
+                    const [fetchedData] = await Promise.all([fetchPromise, minWait]);
+                    data = fetchedData;
 
                     // Populate UI
                     document.getElementById('rtDuration').innerHTML = `${data.cloudwatch.avgDurationMs} <span class="result-unit">ms</span>`;
@@ -446,8 +540,11 @@
                         badge.className = 'badge green';
                         badge.textContent = '✅ Live AWS Data';
                     } else if (data.dataSource === 'live_aws_no_data') {
-                        badge.className = 'badge blue';
-                        badge.textContent = '📡 Live AWS (No Recent Invocations)';
+                        banner.className = 'status-banner warning';
+                        banner.innerHTML = `<span>⚠️ No recent invocations found for <strong>${fnName}</strong>. Please follow the steps below.</span>`;
+                        showDiagnostic('cloudwatch_error');
+                        gsap.set(['#runtimeResultsPanel', '#runtimeValidationPanel', '#runtimeCarbonPanel'], { display: 'none' });
+                        return;
                     } else if (data.dataSource === 'live_aws_error') {
                         badge.className = 'badge orange';
                         badge.textContent = '⚠️ Live AWS (CloudWatch Error)';
@@ -515,6 +612,10 @@
                         showDiagnostic('generic', err.message);
                     }
                 } finally {
+                    if (window.loaderMsgInterval) clearInterval(window.loaderMsgInterval);
+                    const loader = document.getElementById('awesomeLoader');
+                    loader.style.opacity = '0';
+                    setTimeout(() => loader.style.display = 'none', 300); // fade out
                     btn.style.opacity = '1';
                     btn.style.pointerEvents = 'auto';
                 }
