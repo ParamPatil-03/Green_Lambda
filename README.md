@@ -125,6 +125,6 @@ Green Lambda requires AWS `Access Key ID` and `Secret Access Key` exclusively to
 
 ## 👨‍💻 Contributing & Purpose
 
-This framework serves as a Mini Project for Semester 4, aiming to empower stakeholders (Developers, Cloud Architects, and DevOps Teams) to proactively minimize their un-calculated web footprint. 
+This framework serves as a Mini Project for Semester 4, aiming to empower stakeholders (Developers, Cloud Architects, and DevOps Teams) to proactively minimize their un-calculated web footprint.this
 
 Making sustainable programming a pre-requisite, not an afterthought.

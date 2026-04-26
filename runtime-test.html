@@ -245,7 +245,7 @@
                         <div class="result-card primary">
                             <span class="result-label">ML Predicted Energy</span>
                             <div class="result-value" id="rtPredEnergy">-- <span class="result-unit">Wh</span></div>
-                            <span class="result-sub">XGBoost Model (R² = 0.9999)</span>
+                            <span class="result-sub">XGBoost Model (R² = 0.9381)</span>
                         </div>
                         <div class="result-card">
                             <span class="result-label">Actual Measured Energy</span>
@@ -305,7 +305,7 @@
 
                     <div class="dash-card" style="margin-top:1.5rem;">
                         <div class="dash-card-header">
-                            <h3>XGBoost: Predicted vs Actual (R² = 0.9999)</h3>
+                            <h3>XGBoost: Predicted vs Actual (R² = 0.9381)</h3>
                         </div>
                         <div class="chart-wrap" style="height: 400px; position:relative;">
                             <canvas id="scatterChart"></canvas>
@@ -519,7 +519,7 @@
                                 dataSource: 'demo_fallback',
                                 cloudwatch: { avgDurationMs: m.duration, maxMemoryUsedMb: m.memory, invocationCount: m.invocations, errorCount: m.errors },
                                 actualEnergy: { energyWhPerInvocation: m.actual, carbonGco2PerInvocation: carbonGco2, powerWatts: parseFloat((10 + 0.2 * m.memory).toFixed(2)) },
-                                mlPrediction: { energyWhPerInvocation: m.pred, confidence: 0.9999 },
+                                mlPrediction: { energyWhPerInvocation: m.pred, confidence: 0.9381 },
                                 validation: { absoluteErrorWh: absErr, accuracyPercent: m.accuracy, verdict: m.accuracy >= 99 ? 'Excellent' : m.accuracy >= 90 ? 'Good' : 'Needs Review' }
                             });
                         });
