@@ -155,6 +155,148 @@
                             <span class="result-sub">From baseline req/hour</span>
                         </div>
                     </div>
+
+                    <!-- Prediction Intelligence Section -->
+                    <div class="section-header-wrap" style="margin-top: 2.5rem; margin-bottom: 1rem; border-left: 3px solid var(--accent); padding-left: 1rem; display: flex; flex-direction: column; gap: 0.25rem;">
+                        <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                            <h2 style="font-size: 1.4rem; font-weight: 800; letter-spacing: -0.02em; color: var(--text); margin: 0;">Prediction Intelligence</h2>
+                            <span id="simulationBadge" style="display: none; padding: 2px 8px; margin: 0; font-size: 0.75rem; border-radius: 4px; background: rgba(255, 194, 51, 0.1); border: 1px solid var(--amber); color: var(--amber); font-weight: 600;">⚠ Simulated Data — Connect backend for real explanations</span>
+                        </div>
+                        <p style="font-size: 0.85rem; color: var(--text-2); margin: 0;">Why did the model predict this energy value?</p>
+                    </div>
+
+                    <div class="dash-card" style="margin-top: 1rem; padding: 1.5rem;" id="predictionIntelligenceCard">
+                        <!-- Tab Headers -->
+                        <div style="display: flex; gap: 1.5rem; border-bottom: 1px solid var(--border); margin-bottom: 1.5rem; padding-bottom: 0.5rem;">
+                            <button type="button" class="intel-tab-btn active" id="tabFeatureImpactBtn">Feature Impact</button>
+                            <button type="button" class="intel-tab-btn" id="tabModelConfidenceBtn">Model Confidence</button>
+                        </div>
+
+                        <!-- Skeleton State -->
+                        <div id="intelLoadingSkeleton" style="padding: 2.5rem; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1rem; width: 100%;">
+                            <div class="loading-bar-skeleton" style="width: 80%; height: 20px; background: rgba(255, 255, 255, 0.05); border-radius: 4px; animation: skeleton-pulse 1.5s infinite ease-in-out;"></div>
+                            <div class="loading-bar-skeleton" style="width: 60%; height: 16px; background: rgba(255, 255, 255, 0.05); border-radius: 4px; animation: skeleton-pulse 1.5s infinite ease-in-out; animation-delay: 0.2s;"></div>
+                            <div class="loading-bar-skeleton" style="width: 70%; height: 16px; background: rgba(255, 255, 255, 0.05); border-radius: 4px; animation: skeleton-pulse 1.5s infinite ease-in-out; animation-delay: 0.4s;"></div>
+                            <span style="font-family: var(--mono); font-size: 0.8rem; color: var(--text-2); letter-spacing: 0.05em; margin-top: 0.5rem; text-transform: uppercase;">Analyzing prediction factors...</span>
+                        </div>
+
+                        <!-- Error State -->
+                        <div id="intelErrorState" style="padding: 2rem; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 0.5rem; width: 100%; text-align: center;">
+                            <span style="font-size: 1.5rem;">⚠️</span>
+                            <span style="color: var(--red); font-size: 0.95rem; font-weight: 600;">Explanation unavailable for this prediction.</span>
+                            <p style="font-size: 0.8rem; color: var(--text-3); margin: 0;">Ensure backend server is running and SHAP explainer is initialized.</p>
+                        </div>
+
+                        <!-- Tab 1: Feature Impact Content -->
+                        <div id="tabFeatureImpactContent" style="display: none; width: 100%;">
+                            <div style="display: flex; flex-wrap: wrap; width: 100%;">
+                                <!-- Left Side: Waterfall horizontal chart (55%) -->
+                                <div style="flex: 0 0 55%; max-width: 55%; padding-right: 1.5rem; border-right: 1px solid var(--border); display: flex; flex-direction: column; gap: 0.75rem;">
+                                    <div class="dash-card-header" style="padding: 0 0 0.5rem 0;">
+                                        <h3 style="font-size: 0.95rem; font-weight: 700; color: var(--text-2);">Top 5 Impact Factors</h3>
+                                    </div>
+                                    <div class="chart-wrap" style="height: 300px; position: relative; width: 100%;">
+                                        <canvas id="localExplanationChart"></canvas>
+                                    </div>
+                                </div>
+                                <!-- Right Side: Impact Summary Cards (45%) -->
+                                <div style="flex: 0 0 45%; max-width: 45%; padding-left: 1.5rem; display: flex; flex-direction: column; gap: 0.75rem;">
+                                    <div class="dash-card-header" style="padding: 0 0 0.5rem 0;">
+                                        <h3 style="font-size: 0.95rem; font-weight: 700; color: var(--text-2);">Impact Breakdown</h3>
+                                    </div>
+                                    <div id="localImpactList" style="display: flex; flex-direction: column; gap: 0.6rem;">
+                                        <!-- Will be injected dynamically -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Tab 2: Model Confidence Content -->
+                        <div id="tabModelConfidenceContent" style="display: none; width: 100%; flex-direction: column; align-items: center; justify-content: center; padding: 1.5rem 0; text-align: center;">
+                            <div style="display: flex; align-items: center; justify-content: center; gap: 2rem; margin-bottom: 2rem; width: 100%; max-width: 600px; flex-wrap: wrap;">
+                                <div style="flex: 1; min-width: 150px;">
+                                    <div style="font-size: 2.2rem; font-weight: 800; font-family: var(--mono); color: var(--accent-2);" id="confBaseValue">-- mWh</div>
+                                    <div style="font-size: 0.75rem; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 0.25rem;">Baseline Prediction</div>
+                                </div>
+                                <div style="font-size: 1.5rem; color: var(--text-3); display: flex; align-items: center;">⚡</div>
+                                <div style="flex: 1; min-width: 150px;">
+                                    <div class="gradient-text" style="font-size: 2.2rem; font-weight: 800; font-family: var(--mono);" id="confPredictedValue">-- mWh</div>
+                                    <div style="font-size: 0.75rem; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 0.25rem;">Your Function's Prediction</div>
+                                </div>
+                            </div>
+
+                            <!-- Contribution Flow Bar -->
+                            <div style="width: 100%; max-width: 600px; margin-bottom: 1.5rem;">
+                                <div style="width: 100%; height: 12px; background: rgba(255,255,255,0.03); border-radius: 6px; overflow: hidden; display: flex;">
+                                    <div id="flowSegmentBase" style="height: 100%; background: var(--accent-2); width: 0%; transition: width 0.8s var(--ease);"></div>
+                                    <div id="flowSegmentPos" style="height: 100%; background: var(--red); width: 0%; transition: width 0.8s var(--ease);"></div>
+                                    <div id="flowSegmentNeg" style="height: 100%; background: var(--green); width: 0%; transition: width 0.8s var(--ease);"></div>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; font-size: 0.7rem; color: var(--text-3); margin-top: 0.5rem; padding: 0 0.25rem;">
+                                    <span style="display: flex; align-items: center; gap: 0.25rem;"><span style="width: 6px; height: 6px; border-radius: 50%; background: var(--accent-2);"></span> Baseline</span>
+                                    <span style="display: flex; align-items: center; gap: 0.25rem;"><span style="width: 6px; height: 6px; border-radius: 50%; background: var(--red);"></span> Positive Drivers</span>
+                                    <span style="display: flex; align-items: center; gap: 0.25rem;"><span style="width: 6px; height: 6px; border-radius: 50%; background: var(--green);"></span> Negative Drivers</span>
+                                </div>
+                            </div>
+
+                            <!-- Plain English Summary -->
+                            <p id="confExplanationSummary" style="font-size: 0.9rem; line-height: 1.6; color: var(--text-2); max-width: 600px; margin: 0; padding: 0.75rem 1rem; background: rgba(255,255,255,0.01); border: 1px solid var(--border); border-radius: 8px;">
+                                Calculating collective drivers...
+                            </p>
+                        </div>
+                    </div>
+
+                    <style>
+                        @keyframes skeleton-pulse {
+                            0% { opacity: 0.4; }
+                            50% { opacity: 1.0; }
+                            100% { opacity: 0.4; }
+                        }
+                        /* Tab default styles */
+                        .intel-tab-btn {
+                            background: none !important;
+                            border: none !important;
+                            font-family: inherit !important;
+                            font-size: 0.9rem !important;
+                            font-weight: 500 !important;
+                            color: var(--text-3) !important;
+                            border-bottom: 2px solid transparent !important;
+                            padding: 0.5rem 0 !important;
+                            cursor: pointer !important;
+                            transition: all 0.2s !important;
+                        }
+                        /* Tab active styles */
+                        .intel-tab-btn.active {
+                            font-weight: 700 !important;
+                            background: linear-gradient(135deg, var(--accent), var(--accent-2)) !important;
+                            -webkit-background-clip: text !important;
+                            -webkit-text-fill-color: transparent !important;
+                            background-clip: text !important;
+                            border-bottom: 2px solid var(--accent) !important;
+                        }
+                        /* Custom text gradient */
+                        .gradient-text {
+                            background: linear-gradient(135deg, var(--accent), var(--accent-2)) !important;
+                            -webkit-background-clip: text !important;
+                            -webkit-text-fill-color: transparent !important;
+                            background-clip: text !important;
+                        }
+                        /* Small responsive adjust */
+                        @media (max-width: 991px) {
+                            #predictionIntelligenceCard #tabFeatureImpactContent > div {
+                                flex-direction: column !important;
+                            }
+                            #predictionIntelligenceCard #tabFeatureImpactContent > div > div {
+                                flex: 0 0 100% !important;
+                                max-width: 100% !important;
+                                border-right: none !important;
+                                padding: 1rem 0 !important;
+                            }
+                            #predictionIntelligenceCard #tabFeatureImpactContent > div > div:first-child {
+                                border-bottom: 1px solid var(--border) !important;
+                            }
+                        }
+                    </style>
                 </section>
             </div>
 

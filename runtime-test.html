@@ -104,6 +104,11 @@
             0%, 100% { opacity: 0.6; }
             50% { opacity: 1; }
         }
+        @keyframes skeleton-pulse {
+            0% { opacity: 0.4; }
+            50% { opacity: 1.0; }
+            100% { opacity: 0.4; }
+        }
     </style>
 </head>
 
@@ -275,6 +280,83 @@
                         </div>
                         <div class="chart-wrap" style="height: 300px;"><canvas id="rtCompareChart"></canvas></div>
                     </div>
+
+                    <!-- Prediction Gap Analysis Section -->
+                    <div id="predictionGapAnalysisSection" style="display: none; margin-top: 2.5rem;">
+                        <div class="section-header-wrap" style="border-left: 3px solid var(--accent); padding-left: 1rem; display: flex; flex-direction: column; gap: 0.25rem; margin-bottom: 1rem;">
+                            <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                                <h2 style="font-size: 1.4rem; font-weight: 800; letter-spacing: -0.02em; color: #ffffff; margin: 0;">Prediction Gap Analysis</h2>
+                                <span id="gapDemoBadge" style="display: none; padding: 2px 8px; margin: 0; font-size: 0.75rem; border-radius: 4px; background: rgba(255, 194, 51, 0.1); border: 1px solid var(--amber); color: var(--amber); font-weight: 600;">⚠ Demo Data — Connect AWS for real gap analysis</span>
+                            </div>
+                            <p style="font-size: 0.85rem; color: rgba(255, 255, 255, 0.5); margin: 0;">Understanding why the model deviated from actual</p>
+                        </div>
+
+                        <div class="dash-card" style="margin-top: 1rem; padding: 1.5rem;" id="gapAnalysisCard">
+                            <!-- Zone 1: Gap Severity Indicator -->
+                            <div id="gapSeverityBand" style="display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.5rem; border-radius: 6px; margin-bottom: 1.5rem; font-weight: 600;">
+                                <div id="gapSeverityPercent" style="font-size: 1.15rem; font-weight: 800;">0.0% deviation</div>
+                                <div id="gapSeverityLabel" style="text-transform: uppercase; font-size: 0.85rem; letter-spacing: 0.05em;">Minor Deviation</div>
+                            </div>
+
+                            <!-- Skeleton State -->
+                            <div id="gapLoadingSkeleton" style="padding: 2.5rem; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1rem; width: 100%;">
+                                <div class="loading-bar-skeleton" style="width: 80%; height: 20px; background: rgba(255, 255, 255, 0.05); border-radius: 4px; animation: skeleton-pulse 1.5s infinite ease-in-out;"></div>
+                                <div class="loading-bar-skeleton" style="width: 60%; height: 16px; background: rgba(255, 255, 255, 0.05); border-radius: 4px; animation: skeleton-pulse 1.5s infinite ease-in-out; animation-delay: 0.2s;"></div>
+                                <div class="loading-bar-skeleton" style="width: 70%; height: 16px; background: rgba(255, 255, 255, 0.05); border-radius: 4px; animation: skeleton-pulse 1.5s infinite ease-in-out; animation-delay: 0.4s;"></div>
+                                <span style="font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: rgba(255, 255, 255, 0.5); letter-spacing: 0.05em; margin-top: 0.5rem; text-transform: uppercase;">Analyzing prediction gap...</span>
+                            </div>
+
+                            <!-- Error State -->
+                            <div id="gapAnalysisErrorMessage" style="display: none; padding: 2rem; text-align: center; color: var(--amber); font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; font-weight: 500;">
+                                Gap analysis unavailable — backend explanation service offline.
+                            </div>
+
+                            <!-- Content Zone (Zone 2 & Zone 3) -->
+                            <div id="gapAnalysisContent" style="display: none;">
+                                <!-- Zone 2: Why Did This Happen? -->
+                                <div class="form-grid-2" style="margin-bottom: 1.5rem;">
+                                    <!-- Left Column: SHAP Mini Chart -->
+                                    <div>
+                                        <h4 style="font-size: 1rem; font-weight: 700; margin: 0 0 1rem 0; color: rgba(255, 255, 255, 0.9);">Top Drivers of This Prediction</h4>
+                                        <div style="height: 180px; position: relative;">
+                                            <canvas id="gapExplanationChart"></canvas>
+                                        </div>
+                                    </div>
+
+                                    <!-- Right Column: Plain English Diagnosis -->
+                                    <div style="display: flex; flex-direction: column; gap: 1rem;">
+                                        <h4 style="font-size: 1rem; font-weight: 700; margin: 0 0 0.5rem 0; color: rgba(255, 255, 255, 0.9);">What caused the gap?</h4>
+                                        <ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.75rem;">
+                                            <li style="display: flex; gap: 0.75rem; align-items: flex-start; line-height: 1.5; font-size: 0.9rem; color: rgba(255,255,255,0.8);">
+                                                <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); margin-top: 6px; flex-shrink: 0;"></span>
+                                                <span id="gapBullet1">Calculating...</span>
+                                            </li>
+                                            <li style="display: flex; gap: 0.75rem; align-items: flex-start; line-height: 1.5; font-size: 0.9rem; color: rgba(255,255,255,0.8);">
+                                                <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--amber); margin-top: 6px; flex-shrink: 0;"></span>
+                                                <span id="gapBullet2">Calculating...</span>
+                                            </li>
+                                            <li style="display: flex; gap: 0.75rem; align-items: flex-start; line-height: 1.5; font-size: 0.9rem; color: rgba(255,255,255,0.8);">
+                                                <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--accent-2); margin-top: 6px; flex-shrink: 0;"></span>
+                                                <span id="gapBullet3">Calculating...</span>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </div>
+
+                                <!-- Zone 3: Comparison Context -->
+                                <div style="border-top: 1px solid var(--border); padding-top: 1rem; margin-top: 1.5rem; display: flex; flex-direction: column; gap: 0.5rem;">
+                                    <div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 1rem; font-family: 'JetBrains Mono', monospace; font-size: 0.9rem;">
+                                        <div>Model Predicted: <span id="gapContextPredicted" style="color: var(--green); font-weight: 700;">-- mWh</span></div>
+                                        <div style="color: rgba(255,255,255,0.3); font-weight: 400;">vs</div>
+                                        <div>Actual Measured: <span id="gapContextActual" style="color: var(--accent-2); font-weight: 700;">-- mWh</span></div>
+                                    </div>
+                                    <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; color: var(--amber); text-align: center; font-weight: 600;" id="gapContextSummary">
+                                        Gap: -- mWh (--estimated)
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </section>
 
                 <section id="runtimeCarbonPanel" class="results-dashboard" style="display:none; margin-top:2.5rem;">
@@ -413,6 +495,7 @@
             }
 
             let compareChartInstance = null;
+            let gapExplanationChartInstance = null;
 
             // Accurate demo data derived from actual ML training dataset values
             const DEMO_METRICS = {
@@ -442,6 +525,7 @@
 
                 // Hide panels if they were already showing
                 gsap.set(['#runtimeResultsPanel', '#runtimeValidationPanel', '#runtimeCarbonPanel'], { display: 'none' });
+                document.getElementById('predictionGapAnalysisSection').style.display = 'none';
 
                 // Show loader with animation
                 const loader = document.getElementById('awesomeLoader');
@@ -590,6 +674,9 @@
 
                     // Update Chart
                     updateCompareChart(data.functionName, data.mlPrediction.energyWhPerInvocation, data.actualEnergy.energyWhPerInvocation);
+
+                    // Prediction Gap Analysis
+                    loadGapAnalysis(data.functionName, data.mlPrediction.energyWhPerInvocation, data.actualEnergy.energyWhPerInvocation, isDemo);
 
                     banner.className = 'status-banner success';
                     banner.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg> <span>Validation Complete</span>`;
@@ -891,6 +978,265 @@
                 } catch (e) {
                     console.error('Failed to load scatter data:', e);
                 }
+            }
+
+            // ───── Prediction Gap Analysis ─────
+            const categoryMap = {
+                'local_memory_mb': 'memory',
+                'aws_memory_used_mb': 'memory',
+                'memory_config_mb': 'memory',
+                'memory_provisioned_mb': 'memory',
+                'aws_duration_ms': 'duration',
+                'local_duration_ms': 'duration',
+                'local_exec_time_ms': 'duration',
+                'aws_to_local_duration_ratio': 'duration',
+                'duration_ratio': 'duration',
+                'cyclomatic_complexity': 'complexity',
+                'max_nesting_depth': 'complexity',
+                'num_function_calls': 'complexity',
+                'lines_of_code': 'complexity',
+                'source_lines': 'complexity',
+                'num_loops': 'complexity',
+                'num_conditionals': 'complexity'
+            };
+
+            function formatFeatureName(name) {
+                return name
+                    .replace(/_/g, ' ')
+                    .replace(/\b\w/g, c => c.toUpperCase())
+                    .replace('Ms', ' (ms)')
+                    .replace('Mb', ' (MB)')
+                    .replace('Loc', 'LOC');
+            }
+
+            function renderGapExplanation(topFeatures, predictedWh, actualWh) {
+                // Hide skeleton, show content
+                document.getElementById('gapLoadingSkeleton').style.display = 'none';
+                document.getElementById('gapAnalysisErrorMessage').style.display = 'none';
+                document.getElementById('gapAnalysisContent').style.display = 'block';
+
+                if (!topFeatures || topFeatures.length === 0) {
+                    topFeatures = [
+                        { feature: 'local_memory_mb', shap: 0.0035 },
+                        { feature: 'aws_duration_ms', shap: -0.0018 },
+                        { feature: 'cyclomatic_complexity', shap: 0.0008 }
+                    ];
+                }
+
+                // Bullet 1: Primary Driver
+                const topFeat = topFeatures[0];
+                const valMwh = Math.abs(topFeat.shap * 1000).toFixed(2);
+                const direction = topFeat.shap >= 0 ? 'higher' : 'lower';
+                const prettyName = formatFeatureName(topFeat.feature);
+                document.getElementById('gapBullet1').innerHTML = `The model's prediction was most influenced by <strong>${prettyName}</strong>, which pushed the estimate <strong>${valMwh} mWh</strong> <strong>${direction}</strong> than baseline.`;
+
+                // Bullet 2: Gap Direction Insight
+                if (predictedWh > actualWh) {
+                    document.getElementById('gapBullet2').innerHTML = `The model overestimated energy consumption. This typically happens when <strong>${prettyName}</strong> values suggest higher load than what actually ran.`;
+                } else {
+                    document.getElementById('gapBullet2').innerHTML = `The model underestimated energy consumption. This typically happens when runtime conditions exceeded what <strong>${prettyName}</strong> indicated.`;
+                }
+
+                // Bullet 3: Actionable Recommendation
+                const category = categoryMap[topFeat.feature] || 'other';
+                let recText = '';
+                if (category === 'memory') {
+                    recText = 'Consider right-sizing memory allocation for this function to reduce energy variance.';
+                } else if (category === 'duration') {
+                    recText = 'Optimizing execution time could reduce both energy consumption and prediction variance.';
+                } else if (category === 'complexity') {
+                    recText = 'Reducing code complexity may stabilize energy consumption patterns.';
+                } else {
+                    recText = 'Review function configuration to align runtime behavior with model expectations.';
+                }
+                document.getElementById('gapBullet3').textContent = recText;
+
+                // Render Chart
+                const ctx = document.getElementById('gapExplanationChart').getContext('2d');
+                const labels = topFeatures.map(item => formatFeatureName(item.feature));
+                const values = topFeatures.map(item => item.shap * 1000); // convert Wh to mWh
+                const backgroundColors = topFeatures.map(item => item.shap >= 0 ? '#ff3d71' : '#36f9ae');
+
+                if (gapExplanationChartInstance) {
+                    gapExplanationChartInstance.destroy();
+                }
+
+                gapExplanationChartInstance = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            data: values,
+                            backgroundColor: backgroundColors,
+                            borderRadius: 4,
+                            borderWidth: 0,
+                            barPercentage: 0.6
+                        }]
+                    },
+                    options: {
+                        indexAxis: 'y',
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                backgroundColor: 'rgba(10,12,16,0.9)',
+                                titleColor: 'rgba(255,255,255,0.9)',
+                                bodyColor: 'rgba(255,255,255,0.7)',
+                                borderColor: 'rgba(255,255,255,0.1)',
+                                borderWidth: 1,
+                                padding: 8,
+                                callbacks: {
+                                    label: function(context) {
+                                        return ` ${context.parsed.x.toFixed(3)} mWh`;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                grid: { color: 'rgba(255,255,255,0.05)', drawBorder: false },
+                                ticks: { color: 'rgba(255,255,255,0.5)', font: { family: 'JetBrains Mono', size: 9 } },
+                                title: { display: true, text: 'SHAP Value (mWh)', color: 'rgba(255,255,255,0.4)', font: { family: 'Inter', size: 9 } }
+                            },
+                            y: {
+                                grid: { display: false, drawBorder: false },
+                                ticks: { color: 'rgba(255,255,255,0.7)', font: { family: 'Inter', size: 10 } }
+                            }
+                        }
+                    }
+                });
+            }
+
+            function loadGapAnalysis(functionName, predictedWh, actualWh, isDemo) {
+                const gapPct = (Math.abs(predictedWh - actualWh) / actualWh) * 100;
+                const sectionEl = document.getElementById('predictionGapAnalysisSection');
+
+                if (gapPct <= 5) {
+                    sectionEl.style.display = 'none';
+                    return;
+                }
+
+                sectionEl.style.display = 'block';
+
+                const absError = Math.abs(predictedWh - actualWh);
+                const accuracyPercent = Math.max(0, 100 - (absError / actualWh) * 100);
+
+                const severityBand = document.getElementById('gapSeverityBand');
+                const severityPercent = document.getElementById('gapSeverityPercent');
+                const severityLabel = document.getElementById('gapSeverityLabel');
+
+                severityPercent.textContent = `${gapPct.toFixed(1)}% deviation`;
+
+                if (accuracyPercent >= 75) {
+                    severityBand.style.background = 'rgba(255, 194, 51, 0.1)';
+                    severityBand.style.border = '1px solid var(--amber)';
+                    severityBand.style.color = 'var(--amber)';
+                    severityLabel.textContent = 'Minor Deviation';
+                } else {
+                    severityBand.style.background = 'rgba(255, 61, 113, 0.1)';
+                    severityBand.style.border = '1px solid var(--red)';
+                    severityBand.style.color = 'var(--red)';
+                    severityLabel.textContent = 'Significant Deviation';
+                }
+
+                const formatEnergy = (wh) => {
+                    const mwh = wh * 1000;
+                    if (mwh === 0) return '0.00 mWh';
+                    return `${parseFloat(mwh.toFixed(6))} mWh`;
+                };
+
+                const formatGap = (wh) => {
+                    const mwh = wh * 1000;
+                    if (mwh === 0) return '0.00 mWh';
+                    return `${parseFloat(mwh.toFixed(6))} mWh`;
+                };
+
+                document.getElementById('gapContextPredicted').textContent = formatEnergy(predictedWh);
+                document.getElementById('gapContextActual').textContent = formatEnergy(actualWh);
+
+                const dir = predictedWh > actualWh ? 'over' : 'under';
+                document.getElementById('gapContextSummary').textContent = `Gap: ${formatGap(absError)} (${dir}estimated)`;
+
+                const skeleton = document.getElementById('gapLoadingSkeleton');
+                const errorEl = document.getElementById('gapAnalysisErrorMessage');
+                const content = document.getElementById('gapAnalysisContent');
+                const demoBadge = document.getElementById('gapDemoBadge');
+
+                skeleton.style.display = 'flex';
+                errorEl.style.display = 'none';
+                content.style.display = 'none';
+                demoBadge.style.display = 'none';
+
+                if (gapExplanationChartInstance) {
+                    gapExplanationChartInstance.destroy();
+                    gapExplanationChartInstance = null;
+                }
+
+                if (isDemo) {
+                    demoBadge.style.display = 'inline-block';
+                    setTimeout(() => {
+                        let localMemoryShap = 0.0035;
+                        let awsDurationShap = -0.0018;
+                        let complexityShap = 0.0008;
+
+                        if (functionName) {
+                            let hash = 0;
+                            for (let i = 0; i < functionName.length; i++) {
+                                hash = functionName.charCodeAt(i) + ((hash << 5) - hash);
+                            }
+                            localMemoryShap = (hash % 100) / 10000;
+                            awsDurationShap = ((hash >> 8) % 100) / 20000;
+                            complexityShap = ((hash >> 16) % 100) / 50000;
+                            if (localMemoryShap === 0) localMemoryShap = 0.0035;
+                        }
+
+                        const demoShap = [
+                            { feature: 'local_memory_mb', shap: localMemoryShap },
+                            { feature: 'aws_duration_ms', shap: awsDurationShap },
+                            { feature: 'cyclomatic_complexity', shap: complexityShap }
+                        ];
+
+                        renderGapExplanation(demoShap, predictedWh, actualWh);
+                    }, 800);
+                    return;
+                }
+
+                const ak = localStorage.getItem('gl_ak');
+                const sk = localStorage.getItem('gl_sk');
+                const st = localStorage.getItem('gl_st') || null;
+                const region = localStorage.getItem('gl_region') || null;
+
+                fetch('http://localhost:5000/explain-prediction', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        functionName: functionName,
+                        accessKeyId: ak,
+                        secretAccessKey: sk,
+                        sessionToken: st,
+                        region: region
+                    })
+                })
+                .then(res => {
+                    if (!res.ok) throw new Error('API offline');
+                    return res.json();
+                })
+                .then(data => {
+                    if (data.status === 'error' || !data.explanation || !data.explanation.top_features) {
+                        throw new Error(data.message || 'No features');
+                    }
+                    const top3 = data.explanation.top_features.slice(0, 3).map(item => ({
+                        feature: item.feature,
+                        shap: item.shap_value
+                    }));
+                    renderGapExplanation(top3, predictedWh, actualWh);
+                })
+                .catch(err => {
+                    console.error('Gap analysis error:', err);
+                    skeleton.style.display = 'none';
+                    errorEl.style.display = 'block';
+                });
             }
 
             // Execute initially

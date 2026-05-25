@@ -4,16 +4,24 @@ echo ===================================================
 echo     Starting GreenLambda: From Code to Carbon
 echo ===================================================
 echo.
-echo [1/2] Launching the Machine Learning Backend Server...
+echo [1/3] Launching the Machine Learning Backend Server...
 cd /d "%~dp0"
-start cmd /k "cd backend && ..\ml_model\venv\Scripts\activate.bat && python app.py"
+start "GreenLambda Backend" cmd /k "cd backend && ..\ml_model\venv\Scripts\python.exe app.py"
 
-echo [2/2] Opening the UI in your default browser...
+
+echo [2/3] Starting benchmark warm-up invocations (runs once)...
+start "GreenLambda Invocations" cmd /c "cd backend && ..\ml_model\venv\Scripts\python.exe invoke_benchmarks.py"
+
+echo [3/3] Opening the UI in your default browser...
 :: Wait 3 seconds to let Python load up the Machine Learning Models
 timeout /t 3 /nobreak >nul
 start "" "%~dp0index.html"
 
 echo.
 echo Success! GreenLambda is running.
-echo You can close this terminal. Have a great demo!
+echo The Backend server will automatically shut down and close its window
+echo when you close the website (all browser tabs).
+echo.
+echo You can close this launcher terminal now. Have a great demo!
 exit
+

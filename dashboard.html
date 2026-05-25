@@ -164,6 +164,91 @@
                     </div>
                 </div>
 
+                <!-- Model Intelligence Section -->
+                <div class="section-header-wrap" style="margin-top: 2.5rem; margin-bottom: 1rem; border-left: 3px solid var(--accent); padding-left: 1rem; display: flex; flex-direction: column; gap: 0.25rem;">
+                    <h2 style="font-size: 1.4rem; font-weight: 800; letter-spacing: -0.02em; color: var(--text); margin: 0;">Model Intelligence</h2>
+                    <p style="font-size: 0.85rem; color: var(--text-2); margin: 0;">What drives energy consumption predictions</p>
+                </div>
+
+                <div class="dash-card" style="margin-top: 1rem;" id="modelIntelligencePanel">
+                    <!-- Loading Skeleton State -->
+                    <div id="modelShapLoading" style="padding: 2.5rem; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1rem; width: 100%;">
+                        <div class="loading-bar-skeleton" style="width: 80%; height: 20px; background: rgba(255, 255, 255, 0.05); border-radius: 4px; animation: skeleton-pulse 1.5s infinite ease-in-out;"></div>
+                        <div class="loading-bar-skeleton" style="width: 60%; height: 16px; background: rgba(255, 255, 255, 0.05); border-radius: 4px; animation: skeleton-pulse 1.5s infinite ease-in-out; animation-delay: 0.2s;"></div>
+                        <div class="loading-bar-skeleton" style="width: 70%; height: 16px; background: rgba(255, 255, 255, 0.05); border-radius: 4px; animation: skeleton-pulse 1.5s infinite ease-in-out; animation-delay: 0.4s;"></div>
+                        <span style="font-family: var(--mono); font-size: 0.8rem; color: var(--text-2); letter-spacing: 0.05em; margin-top: 0.5rem; text-transform: uppercase;">Analyzing model intelligence...</span>
+                    </div>
+
+                    <!-- Error State (Hidden by default) -->
+                    <div id="modelShapError" style="padding: 2.5rem; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 0.5rem; width: 100%; text-align: center;">
+                        <span style="font-size: 1.5rem;">⚠️</span>
+                        <strong style="color: var(--red); font-size: 0.95rem;">Model intelligence unavailable. Ensure backend is running.</strong>
+                        <p style="font-size: 0.8rem; color: var(--text-3); margin: 0;">Failed to establish connection with the SHAP explanation API.</p>
+                    </div>
+
+                    <!-- Loaded Content State (Hidden by default) -->
+                    <div id="modelShapLoaded" style="display: none; width: 100%;">
+                        <div style="display: flex; flex-wrap: wrap; width: 100%;">
+                            <!-- Left Side: Horizontal Bar Chart (60%) -->
+                            <div style="flex: 0 0 60%; max-width: 60%; padding: 1rem 1.5rem 1rem 1rem; border-right: 1px solid var(--border); display: flex; flex-direction: column; gap: 0.75rem;">
+                                <div class="dash-card-header" style="padding: 0 0 0.5rem 0;">
+                                    <h3 style="font-size: 0.95rem; font-weight: 700; color: var(--text-2);">Top 10 Feature Drivers</h3>
+                                </div>
+                                <div class="chart-wrap" style="height: 380px; position: relative; width: 100%;">
+                                    <canvas id="globalImportanceChart"></canvas>
+                                </div>
+                            </div>
+
+                            <!-- Right Side: Ranked List (40%) -->
+                            <div style="flex: 0 0 40%; max-width: 40%; padding: 1rem 1rem 1rem 1.5rem; display: flex; flex-direction: column; gap: 0.75rem;">
+                                <div class="dash-card-header" style="padding: 0 0 0.5rem 0;">
+                                    <h3 style="font-size: 0.95rem; font-weight: 700; color: var(--text-2);">Feature Impact Rankings</h3>
+                                </div>
+                                <div id="shapRankedList" style="display: flex; flex-direction: column; gap: 0.6rem; overflow-y: auto; max-height: 380px;">
+                                    <!-- Dynamic items will be injected here -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <style>
+                    /* Loading Skeleton Animations */
+                    @keyframes skeleton-pulse {
+                        0% { opacity: 0.4; }
+                        50% { opacity: 1.0; }
+                        100% { opacity: 0.4; }
+                    }
+                    
+                    /* Custom Scrollbar for Ranked List */
+                    #shapRankedList::-webkit-scrollbar {
+                        width: 4px;
+                    }
+                    #shapRankedList::-webkit-scrollbar-track {
+                        background: transparent;
+                    }
+                    #shapRankedList::-webkit-scrollbar-thumb {
+                        background: var(--border-h);
+                        border-radius: 10px;
+                    }
+                    
+                    /* Responsive adjust for flex-wrap */
+                    @media (max-width: 991px) {
+                        #modelIntelligencePanel #modelShapLoaded > div {
+                            flex-direction: column !important;
+                        }
+                        #modelIntelligencePanel #modelShapLoaded > div > div {
+                            flex: 0 0 100% !important;
+                            max-width: 100% !important;
+                            border-right: none !important;
+                            padding: 1rem !important;
+                        }
+                        #modelIntelligencePanel #modelShapLoaded > div > div:first-child {
+                            border-bottom: 1px solid var(--border) !important;
+                        }
+                    }
+                </style>
+
                 <div class="dash-card" style="margin-top:1.5rem;" id="optimizationAlertPanel">
                     <div class="dash-card-header">
                         <h3>⚙️ Optimization Alerts</h3>

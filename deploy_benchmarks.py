@@ -46,7 +46,16 @@ def deploy_lambdas(access_key, secret_key, region):
             with open(zip_path, 'rb') as f:
                 zipped_code = f.read()
 
-            print(f"Deploying/Updating AWS Lambda: {func_name} ...")
+            print(f"Cleaning existing function {func_name} (if present)...")
+            try:
+                lambda_client.delete_function(FunctionName=func_name)
+                print(f"   [DELETED] Old function {func_name} removed.")
+            except lambda_client.exceptions.ResourceNotFoundException:
+                pass
+            except Exception as delete_err:
+                print(f"   [WARNING] Could not delete {func_name}: {str(delete_err)}")
+
+            print(f"Deploying AWS Lambda: {func_name} ...")
             try:
                 lambda_client.create_function(
                     FunctionName=func_name,
@@ -58,16 +67,9 @@ def deploy_lambdas(access_key, secret_key, region):
                     MemorySize=128
                 )
                 print(f"   [SUCCESS] Created new {func_name} (Python 3.11).")
-            except lambda_client.exceptions.ResourceConflictException:
-                lambda_client.update_function_code(FunctionName=func_name, ZipFile=zipped_code)
-                try:
-                    # Upgrade the environment config ensuring it's 3.11
-                    lambda_client.update_function_configuration(FunctionName=func_name, Runtime='python3.11')
-                    print(f"   [SUCCESS] Updated {func_name} Code & Runtime to Python 3.11.")
-                except Exception as config_err:
-                    print(f"   [WARNING] Code updated, but Runtime update failed: {str(config_err)}")
             except Exception as e:
                 print(f"   [ERROR] Failed to deploy {func_name}: {str(e)}")
+
 
 if __name__ == "__main__":
     import sys

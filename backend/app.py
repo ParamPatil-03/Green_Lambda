@@ -1,10 +1,19 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import os
+import sys
+
+# Ensure backend directory is in the import path
+BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
+if BACKEND_DIR not in sys.path:
+    sys.path.insert(0, BACKEND_DIR)
+
 import pickle
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
+import model_loader
+import shap_explainer
 
 app = Flask(__name__)
 CORS(app)
@@ -29,24 +38,17 @@ except Exception as e:
     print(f"Error loading dataset: {e}")
     fn_lookup = None
 
-# Load Models
-models = {}
-scaler = None
-feature_names = None
-
+# Load Models via centralized model_loader (Singleton)
 try:
-    with open(os.path.join(MODELS_DIR, 'xgboost_model.pkl'), 'rb') as f:
-        models['xgboost'] = pickle.load(f)
-    with open(os.path.join(MODELS_DIR, 'random_forest_model.pkl'), 'rb') as f:
-        models['random_forest'] = pickle.load(f)
-    with open(os.path.join(MODELS_DIR, 'neural_network_model.pkl'), 'rb') as f:
-        models['neural_network'] = pickle.load(f)
-    with open(os.path.join(MODELS_DIR, 'scaler.pkl'), 'rb') as f:
-        scaler = pickle.load(f)
-    with open(os.path.join(MODELS_DIR, 'feature_names.pkl'), 'rb') as f:
-        feature_names = pickle.load(f)
+    loader = model_loader.get_loader()
+    models = loader.models
+    scaler = loader.get_scaler()
+    feature_names = loader.get_feature_names()
 except Exception as e:
-    print(f"Error loading models: {e}")
+    print(f"Error loading models via ModelLoader: {e}")
+    models = {}
+    scaler = None
+    feature_names = None
 
 def prepare_features(fn_name):
     """Retrieve features for a function and format them to match training data."""
@@ -55,8 +57,11 @@ def prepare_features(fn_name):
 
     row = fn_lookup[fn_lookup['function_name'] == fn_name]
     if row.empty:
-        # Real function not in training set — use first row as numeric baseline
-        row = fn_lookup.iloc[[0]].copy()
+        # Real function not in training set — use a deterministic hash of the function name 
+        # to select a baseline row from fn_lookup to provide realistic variation.
+        import zlib
+        idx = zlib.adler32(fn_name.encode('utf-8')) % len(fn_lookup)
+        row = fn_lookup.iloc[[idx]].copy()
 
     def fval(col):
         """Safely extract a float value from the row."""
@@ -192,7 +197,8 @@ def analyze_function():
     data = request.json
     fn_name = data.get('functionName')
     model_name = data.get('model', 'xgboost')
-    if model_name == 'neural_net': model_name = 'neural_network'
+    if model_name in ['neural_net', 'nn']: model_name = 'neural_network'
+    elif model_name == 'rf': model_name = 'random_forest'
     
     baseline_rph = float(data.get('baselineRph', 10000))
     
@@ -339,7 +345,8 @@ def predict_spike():
     data = request.json
     fn_name = data.get('functionName')
     model_name = data.get('model', 'xgboost')
-    if model_name == 'neural_net': model_name = 'neural_network'
+    if model_name in ['neural_net', 'nn']: model_name = 'neural_network'
+    elif model_name == 'rf': model_name = 'random_forest'
     baseline_rph = float(data.get('baselineRph', 10000))
     multiplier = float(data.get('multiplier', 20))
     duration_hours = int(data.get('durationHours', 72))
@@ -538,7 +545,14 @@ def collect_runtime_metrics():
                 "json-parser":       {"duration": 108,   "memory": 72,  "invocations": 31500, "errors": 0},
                 "image-resizer":     {"duration": 740,   "memory": 486, "invocations": 7200,  "errors": 4}
             }
-            fb = fallbacks.get(fn_name, {"duration": 250, "memory": 128, "invocations": 900, "errors": 2})
+            if fn_name not in fallbacks:
+                # Deterministic zlib-hash lookup key from fallbacks dict to provide distinct mock data for custom names
+                import zlib
+                keys = list(fallbacks.keys())
+                idx = zlib.adler32(fn_name.encode('utf-8')) % len(keys)
+                fb = fallbacks[keys[idx]]
+            else:
+                fb = fallbacks[fn_name]
             avg_duration = float(fb["duration"])
             max_mem      = float(fb["memory"])
             invocations  = float(fb["invocations"])
@@ -653,5 +667,213 @@ def get_scatter_data():
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
+@app.route('/explain-prediction', methods=['POST'])
+def explain_prediction_endpoint():
+    """
+    Exposes prediction-level SHAP explanations to the frontend.
+    Accepts flat or nested feature JSON and returns ranked contribution metrics.
+    """
+    print("[SHAP] explain-prediction called")
+    try:
+        data = request.json or {}
+        
+        # Flexibly unwrap nested 'features' structure if present
+        if "features" in data:
+            features = data["features"]
+        else:
+            features = data
+            
+        # Resolve features if functionName/function_name is provided but typical raw features are missing
+        fn_name_input = features.get("functionName") or features.get("function_name")
+        if fn_name_input and any(f not in features for f in ['memory_config_mb', 'lines_of_code', 'num_loops']):
+            # Load static baseline features
+            X_single, row_details = prepare_features(fn_name_input)
+            
+            # Optionally check if there's active session in active_sessions
+            conn_id = data.get('connectionId')
+            creds = active_sessions.get(conn_id, {}) if conn_id else {}
+            access_key = creds.get('accessKeyId')
+            secret_key = creds.get('secretAccessKey')
+            region = creds.get('region', 'ap-south-1')
+            
+            # If credentials found, do live CloudWatch duration/AST profiling
+            live_duration_ms = None
+            if access_key and access_key != "TEST-KEY-123":
+                try:
+                    import boto3
+                    from datetime import datetime, timedelta
+                    cw = boto3.client('cloudwatch', 
+                                      aws_access_key_id=access_key, 
+                                      aws_secret_access_key=secret_key, 
+                                      region_name=region)
+                    
+                    end_time = datetime.utcnow()
+                    start_time = end_time - timedelta(days=14)
+                    cw_res = cw.get_metric_statistics(
+                        Namespace='AWS/Lambda',
+                        MetricName='Duration',
+                        Dimensions=[{'Name': 'FunctionName', 'Value': fn_name_input}],
+                        StartTime=start_time,
+                        EndTime=end_time,
+                        Period=86400,
+                        Statistics=['Average']
+                    )
+                    
+                    if cw_res['Datapoints']:
+                        live_duration_ms = sum(dp['Average'] for dp in cw_res['Datapoints']) / len(cw_res['Datapoints'])
+                        X_single['aws_duration_ms'] = live_duration_ms
+                        
+                    # Radon cc_visit AST
+                    import requests
+                    import tempfile
+                    import zipfile
+                    from radon.complexity import cc_visit
+                    
+                    lb = boto3.client('lambda', 
+                                      aws_access_key_id=access_key, 
+                                      aws_secret_access_key=secret_key, 
+                                      region_name=region)
+                    
+                    fn_info = lb.get_function(FunctionName=fn_name_input)
+                    code_url = fn_info['Code']['Location']
+                    r = requests.get(code_url, timeout=10)
+                    with tempfile.TemporaryDirectory() as tmpdir:
+                        zip_path = os.path.join(tmpdir, 'lambda_code.zip')
+                        with open(zip_path, 'wb') as f:
+                            f.write(r.content)
+                        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                            zip_ref.extractall(tmpdir)
+                        
+                        total_loc = 0
+                        complexities = []
+                        for root, dirs, files in os.walk(tmpdir):
+                            for file in files:
+                                if file.endswith('.py'):
+                                    py_path = os.path.join(root, file)
+                                    with open(py_path, 'r', encoding='utf-8') as pyf:
+                                        content = pyf.read()
+                                        lines = content.splitlines()
+                                        total_loc += len([line for line in lines if line.strip() and not line.strip().startswith('#')])
+                                        try:
+                                            blocks = cc_visit(content)
+                                            if blocks:
+                                                complexities.extend([b.complexity for b in blocks])
+                                        except:
+                                            pass
+                        if total_loc > 0:
+                            X_single['lines_of_code'] = total_loc
+                            if complexities:
+                                X_single['cyclomatic_complexity'] = sum(complexities) / len(complexities)
+                except Exception as live_err:
+                    print(f"Live AWS integration for explain-prediction failed: {live_err}")
+            
+            features = X_single.iloc[0].to_dict()
+            
+        # Get required feature list from model_loader
+        req_features = model_loader.get_feature_names()
+        if not req_features:
+            return jsonify({"status": "error", "message": "Feature list not loaded from model_loader."}), 500
+            
+        # Validate that all required features are present
+        raw_features = [
+            'function_name', 'function_type', 'input_size', 'memory_config_mb', 
+            'cold_start', 'lines_of_code', 'num_loops', 'num_conditionals', 
+            'num_function_calls', 'cyclomatic_complexity', 'max_nesting_depth', 
+            'local_duration_ms', 'local_cpu_percent', 'local_memory_mb', 
+            'aws_duration_ms', 'aws_memory_used_mb', 'duration_ratio', 
+            'memory_efficiency', 'calibration_ratio'
+        ]
+        
+        missing_features = [f for f in raw_features if f not in features]
+        # If any raw features are missing, check if they passed the pre-encoded 34 features instead
+        if missing_features:
+            missing_encoded = [f for f in req_features if f not in features]
+            if missing_encoded:
+                return jsonify({
+                    "status": "error",
+                    "message": f"Missing required features: {', '.join(missing_features)}"
+                }), 400
+                
+        # Call the SHAP explanation generator with the requested model
+        model_name = data.get('model', 'xgboost')
+        explanation = shap_explainer.explain_prediction(features, model_name=model_name)
+        
+        return jsonify({
+            "status": "success",
+            "explanation": explanation
+        }), 200
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            "status": "error",
+            "message": f"Internal SHAP error: {str(e)}"
+        }), 500
+
+@app.route('/global-importance', methods=['GET'])
+def get_global_importance_endpoint():
+    """
+    Exposes global-level SHAP importance rankings to the frontend.
+    """
+    print("[SHAP] global-importance called")
+    try:
+        global_imp = shap_explainer.get_global_importance()
+        return jsonify({
+            "status": "success",
+            "global_importance": global_imp
+        }), 200
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            "status": "error",
+            "message": f"Internal SHAP error: {str(e)}"
+        }), 500
+
+# --- HEARTBEAT MONITOR SYSTEM ---
+# Automatic shutdown when the browser frontend is closed
+import time
+import threading
+
+last_heartbeat_time = None
+heartbeat_lock = threading.Lock()
+
+@app.route('/api/heartbeat', methods=['POST'])
+def heartbeat():
+    global last_heartbeat_time
+    with heartbeat_lock:
+        last_heartbeat_time = time.time()
+    return jsonify({"status": "alive"}), 200
+
+def monitor_heartbeat():
+    # Phase 1: Wait for initial heartbeat or exit if none received within 60 seconds of startup
+    start_time = time.time()
+    while True:
+        time.sleep(2)
+        with heartbeat_lock:
+            if last_heartbeat_time is not None:
+                print("[Heartbeat Monitor] Initial connection established with browser frontend.")
+                break
+        if time.time() - start_time > 60:
+            print("[Heartbeat Monitor] No initial heartbeat received within 60 seconds of startup. Shutting down Flask server...")
+            os._exit(0)
+
+    # Phase 2: Active monitoring: check if heartbeat is missing for > 12 seconds
+    while True:
+        time.sleep(2)
+        with heartbeat_lock:
+            elapsed = time.time() - last_heartbeat_time
+        if elapsed > 12:  # No heartbeat for 12 seconds
+            print(f"[Heartbeat Monitor] No heartbeat received for {int(elapsed)} seconds. Shutting down Flask server...")
+            os._exit(0)
+
+# Start monitor thread only in the main reloader worker process if in debug mode, or if not debugging
+if not app.debug or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
+    t = threading.Thread(target=monitor_heartbeat, daemon=True)
+    t.start()
+
+
 if __name__ == '__main__':
     app.run(port=5000, debug=True)
+

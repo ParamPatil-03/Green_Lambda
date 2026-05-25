@@ -21,3 +21,8 @@ Thumbs.db
 
 # Jupyter Notebook configs
 .ipynb_checkpoints/
+
+# AWS Credentials / Secrets
+aws_session.json
+backend/aws_session.json
+

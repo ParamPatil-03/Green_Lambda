@@ -1374,7 +1374,17 @@ function createDemoAnalysis({ baselineRph, functionName, model }) {
         'image-resizer': { energyWh: 1.640, confidence: 0.932, memoryMb: 1024, avgDurationMs: 740 }
     };
 
-    const profile = fnProfiles[functionName] || { energyWh: 1.5, confidence: 0.93, memoryMb: 512, avgDurationMs: 500 };
+    let profile = fnProfiles[functionName];
+    if (!profile) {
+        // Deterministic hashing of the function name to select one of the baseline profiles
+        const keys = Object.keys(fnProfiles);
+        let hash = 0;
+        for (let i = 0; i < functionName.length; i++) {
+            hash = functionName.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        const idx = Math.abs(hash) % keys.length;
+        profile = fnProfiles[keys[idx]];
+    }
 
     // Create deterministic variations per model so clicking a different model genuinely changes the prediction!
     let energyMod = 1.0;
@@ -1632,7 +1642,36 @@ async function initConnectPage() {
         wrap.hidden = false;
         renderFunctionList(existing.functions, list, count);
         setBanner(status, 'ok', `Your AWS connection was loaded securely from your account! You can go straight to Analysis, or reconnect to refresh your functions.`);
+    } else {
+        // Auto-detect backend connection status
+        setBanner(status, 'loading', '⏳ Starting backend connection (initializing ML models)...');
+        const checkBackendConnection = async () => {
+            const base = typeof getApiBase === 'function' ? getApiBase() : 'http://127.0.0.1:5000';
+            try {
+                const res = await fetch(`${base}/api/heartbeat`, { 
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ timestamp: Date.now() })
+                });
+                return res.ok;
+            } catch (e) {
+                return false;
+            }
+        };
+        const interval = setInterval(async () => {
+            if (await checkBackendConnection()) {
+                clearInterval(interval);
+                setBanner(status, 'ok', '✓ Backend server is online and ready.');
+            }
+        }, 1500);
+        checkBackendConnection().then(online => {
+            if (online) {
+                clearInterval(interval);
+                setBanner(status, 'ok', '✓ Backend server is online and ready.');
+            }
+        });
     }
+
 
     form.addEventListener('submit', async (event) => {
         event.preventDefault();
@@ -1804,6 +1843,341 @@ function initAnalyzePage() {
 
     let latestAnalysis = getStoredJson(GREENLAMBDA_KEYS.analysis) || null;
     let spikeChart = null;
+    let localExplanationChartInstance = null;
+
+    // Tab switching logic for Prediction Intelligence Card
+    const tabFeatureImpactBtn = document.getElementById('tabFeatureImpactBtn');
+    const tabModelConfidenceBtn = document.getElementById('tabModelConfidenceBtn');
+    const tabFeatureImpactContent = document.getElementById('tabFeatureImpactContent');
+    const tabModelConfidenceContent = document.getElementById('tabModelConfidenceContent');
+    
+    if (tabFeatureImpactBtn && tabModelConfidenceBtn && tabFeatureImpactContent && tabModelConfidenceContent) {
+        tabFeatureImpactBtn.addEventListener('click', () => {
+            tabFeatureImpactBtn.classList.add('active');
+            tabModelConfidenceBtn.classList.remove('active');
+            
+            // GSAP smooth opacity switch
+            gsap.to(tabModelConfidenceContent, { opacity: 0, duration: 0.15, onComplete: () => {
+                tabModelConfidenceContent.style.display = 'none';
+                tabFeatureImpactContent.style.display = 'block';
+                gsap.fromTo(tabFeatureImpactContent, { opacity: 0 }, { opacity: 1, duration: 0.25 });
+            }});
+        });
+        
+        tabModelConfidenceBtn.addEventListener('click', () => {
+            tabModelConfidenceBtn.classList.add('active');
+            tabFeatureImpactBtn.classList.remove('active');
+            
+            // GSAP smooth opacity switch
+            gsap.to(tabFeatureImpactContent, { opacity: 0, duration: 0.15, onComplete: () => {
+                tabFeatureImpactContent.style.display = 'none';
+                tabModelConfidenceContent.style.display = 'flex';
+                gsap.fromTo(tabModelConfidenceContent, { opacity: 0 }, { opacity: 1, duration: 0.25 });
+            }});
+        });
+    }
+
+    function renderIntelligenceUI(explanation) {
+        const topFeatures = explanation.top_features || [];
+        
+        // Wh to mWh conversion (1 Wh = 1000 mWh)
+        const baseValueMwh = explanation.base_value * 1000;
+        const predictedValueMwh = explanation.predicted_value * 1000;
+        
+        // 1. Populate Tab 1 Horizontal Bar Chart
+        const localExplanationChartCanvas = document.getElementById('localExplanationChart');
+        if (localExplanationChartCanvas) {
+            if (localExplanationChartInstance) {
+                localExplanationChartInstance.destroy();
+                localExplanationChartInstance = null;
+            }
+            
+            const labels = topFeatures.map(item => getHumanReadableFeatureName(item.feature));
+            const dataValues = topFeatures.map(item => item.shap_value * 1000);
+            const barColors = dataValues.map(val => val >= 0 ? '#ff3d71' : '#36f9ae');
+            
+            const ctx = localExplanationChartCanvas.getContext('2d');
+            localExplanationChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: dataValues,
+                        backgroundColor: barColors,
+                        borderRadius: 4,
+                        borderSkipped: false
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: '#161616',
+                            titleColor: '#f0f0f0',
+                            bodyColor: '#8a8a8a',
+                            borderColor: 'rgba(255, 255, 255, 0.08)',
+                            borderWidth: 1,
+                            callbacks: {
+                                label: function(context) {
+                                    const val = context.raw;
+                                    const sign = val >= 0 ? '+' : '';
+                                    return `Impact: ${sign}${val.toFixed(3)} mWh`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: 'rgba(255, 255, 255, 0.05)', zeroLineColor: '#ffffff' },
+                            ticks: { color: '#8a8a8a', font: { family: 'JetBrains Mono', size: 10 } }
+                        },
+                        y: {
+                            grid: { display: false },
+                            ticks: { color: '#f0f0f0', font: { family: 'Inter', size: 11, weight: '500' } }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // 2. Populate Tab 1 Ranked Impact Summary Cards
+        const localImpactList = document.getElementById('localImpactList');
+        if (localImpactList) {
+            localImpactList.innerHTML = '';
+            
+            topFeatures.forEach((item, index) => {
+                const readableName = getHumanReadableFeatureName(item.feature);
+                const valMwh = item.shap_value * 1000;
+                const isPositive = valMwh >= 0;
+                const directionText = isPositive ? '↑ Increases Energy' : '↓ Reduces Energy';
+                const directionColor = isPositive ? 'var(--red)' : 'var(--green)';
+                const borderLeftColor = isPositive ? '#ff3d71' : '#36f9ae';
+                const sign = isPositive ? '+' : '';
+                const formattedValue = `${sign}${valMwh.toFixed(3)} mWh`;
+                
+                const card = document.createElement('div');
+                card.className = 'shap-impact-card';
+                
+                const glowRgb = isPositive ? '255, 61, 113' : '54, 249, 174';
+                const glowStyle = `box-shadow: 0 0 10px rgba(${glowRgb}, 0.12); border: 1px solid rgba(${glowRgb}, 0.25) !important;`;
+                
+                card.style.cssText = `
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    background: rgba(255, 255, 255, 0.02);
+                    border-left: 3px solid ${borderLeftColor} !important;
+                    border-radius: 6px;
+                    padding: 0.65rem 0.85rem;
+                    gap: 0.5rem;
+                    ${glowStyle}
+                    opacity: 0;
+                    transform: translateY(15px);
+                `;
+                
+                card.innerHTML = `
+                    <div style="display: flex; flex-direction: column; gap: 0.15rem; max-width: 70%;">
+                        <span style="font-size: 0.8rem; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${readableName}">${readableName}</span>
+                        <span style="font-size: 0.72rem; font-weight: 500; color: ${directionColor};">${directionText}</span>
+                    </div>
+                    <div style="font-family: var(--mono); font-size: 0.8rem; font-weight: 700; color: var(--text);">${formattedValue}</div>
+                `;
+                
+                localImpactList.appendChild(card);
+            });
+            
+            // GSAP Stagger
+            gsap.to('.shap-impact-card', {
+                opacity: 1,
+                y: 0,
+                stagger: 0.08,
+                duration: 0.4,
+                overwrite: 'auto',
+                ease: 'power2.out'
+            });
+        }
+        
+        // 3. Populate Tab 2 Model Confidence
+        const confBaseValue = document.getElementById('confBaseValue');
+        const confPredictedValue = document.getElementById('confPredictedValue');
+        const flowSegmentBase = document.getElementById('flowSegmentBase');
+        const flowSegmentPos = document.getElementById('flowSegmentPos');
+        const flowSegmentNeg = document.getElementById('flowSegmentNeg');
+        const confExplanationSummary = document.getElementById('confExplanationSummary');
+        
+        if (confBaseValue && confPredictedValue && flowSegmentBase && flowSegmentPos && flowSegmentNeg && confExplanationSummary) {
+            confBaseValue.textContent = `${baseValueMwh.toFixed(3)} mWh`;
+            confPredictedValue.textContent = `${predictedValueMwh.toFixed(3)} mWh`;
+            
+            let totalPos = 0;
+            let totalNeg = 0;
+            
+            topFeatures.forEach(item => {
+                const val = item.shap_value * 1000;
+                if (val >= 0) totalPos += val;
+                else totalNeg += Math.abs(val);
+            });
+            
+            const totalSum = baseValueMwh + totalPos + totalNeg;
+            const basePct = totalSum > 0 ? (baseValueMwh / totalSum) * 100 : 33.3;
+            const posPct = totalSum > 0 ? (totalPos / totalSum) * 100 : 33.3;
+            const negPct = totalSum > 0 ? (totalNeg / totalSum) * 100 : 33.3;
+            
+            flowSegmentBase.style.width = `${basePct}%`;
+            flowSegmentPos.style.width = `${posPct}%`;
+            flowSegmentNeg.style.width = `${negPct}%`;
+            
+            const diffPct = ((predictedValueMwh - baseValueMwh) / Math.max(baseValueMwh, 0.001)) * 100;
+            const relationshipWord = diffPct >= 0 ? 'higher' : 'lower';
+            const absoluteDiffPct = Math.abs(diffPct).toFixed(1);
+            
+            const topDriver = topFeatures.length > 0 ? getHumanReadableFeatureName(topFeatures[0].feature) : 'unknown features';
+            
+            // Retrieve the top code-level/complexity driver if it differs from the primary driver
+            const codeMetrics = ['lines_of_code', 'num_loops', 'num_conditionals', 'cyclomatic_complexity', 'max_nesting_depth'];
+            const topCodeDriverObj = topFeatures.find(f => codeMetrics.includes(f.feature));
+            const topCodeDriver = topCodeDriverObj ? getHumanReadableFeatureName(topCodeDriverObj.feature) : null;
+            
+            let driverText = `primarily driven by <strong>${topDriver}</strong>`;
+            if (topCodeDriver && topCodeDriver !== topDriver) {
+                driverText += `, with <strong>${topCodeDriver}</strong> as the chief code-level driver`;
+            }
+            
+            confExplanationSummary.innerHTML = `Your function's energy consumption is <strong style="color: ${diffPct >= 0 ? 'var(--red)' : 'var(--green)'};">${absoluteDiffPct}% ${relationshipWord}</strong> than the model baseline, ${driverText}.`;
+        }
+    }
+
+    async function loadPredictionExplanation(featureInput, isSimulated) {
+        const skeleton = document.getElementById('intelLoadingSkeleton');
+        const errorState = document.getElementById('intelErrorState');
+        const impactContent = document.getElementById('tabFeatureImpactContent');
+        const confidenceContent = document.getElementById('tabModelConfidenceContent');
+        const simulationBadge = document.getElementById('simulationBadge');
+        const card = document.getElementById('predictionIntelligenceCard');
+        
+        if (!skeleton || !errorState || !impactContent || !confidenceContent) return;
+        
+        // Reset display states
+        skeleton.style.display = 'none';
+        errorState.style.display = 'none';
+        impactContent.style.display = 'none';
+        confidenceContent.style.display = 'none';
+        if (simulationBadge) simulationBadge.style.display = 'none';
+        if (card) card.style.display = 'block';
+        
+        if (isSimulated) {
+            if (simulationBadge) simulationBadge.style.display = 'inline-block';
+            
+            // Show loading state briefly for a premium micro-animation feel
+            skeleton.style.display = 'flex';
+            
+            setTimeout(() => {
+                // Generate deterministic mock SHAP values for Simulation Mode
+                // based on the functionName and model selected so they are beautifully distinct!
+                const fnName = featureInput.functionName || 'bubble-sort';
+                const modelName = featureInput.model || 'xgboost';
+                
+                let hash = 0;
+                for (let i = 0; i < fnName.length; i++) {
+                    hash = fnName.charCodeAt(i) + ((hash << 5) - hash);
+                }
+                
+                let modelFactor = 1.0;
+                if (modelName === 'rf') {
+                    modelFactor = 1.03;
+                } else if (modelName === 'nn') {
+                    modelFactor = 0.97;
+                }
+                
+                // Base values matching the real dataset baseline
+                const baseEnergyMwh = 2400 + (Math.abs(hash) % 12) * 150;
+                const predictedEnergyMwh = baseEnergyMwh * modelFactor * (0.92 + (Math.abs(hash * 3) % 15) / 100);
+                const diffMwh = predictedEnergyMwh - baseEnergyMwh;
+                
+                // Distribute SHAP values deterministically
+                const memoryVal = diffMwh * 0.72;
+                const locVal = diffMwh * 0.15;
+                const typeVal = diffMwh * 0.08;
+                const durVal = diffMwh * 0.05;
+                
+                const mockSHAP = [
+                    { feature: 'local_memory_mb', shap_value: memoryVal / 1000, direction: memoryVal >= 0 ? 'increases' : 'decreases' },
+                    { feature: 'lines_of_code', shap_value: locVal / 1000, direction: locVal >= 0 ? 'increases' : 'decreases' },
+                    { feature: 'function_type_memory', shap_value: typeVal / 1000, direction: typeVal >= 0 ? 'increases' : 'decreases' },
+                    { feature: 'local_duration_ms', shap_value: durVal / 1000, direction: durVal >= 0 ? 'increases' : 'decreases' },
+                    { feature: 'cyclomatic_complexity', shap_value: (diffMwh * 0.01) / 1000, direction: diffMwh >= 0 ? 'increases' : 'decreases' }
+                ];
+                
+                // Sort by absolute value
+                mockSHAP.sort((a, b) => Math.abs(b.shap_value) - Math.abs(a.shap_value));
+                
+                const explanation = {
+                    base_value: baseEnergyMwh / 1000,
+                    predicted_value: predictedEnergyMwh / 1000,
+                    top_features: mockSHAP
+                };
+                
+                gsap.to(skeleton, { opacity: 0, duration: 0.15, onComplete: () => {
+                    skeleton.style.display = 'none';
+                    renderIntelligenceUI(explanation);
+                    
+                    if (tabFeatureImpactBtn && tabModelConfidenceBtn) {
+                        tabFeatureImpactBtn.classList.add('active');
+                        tabModelConfidenceBtn.classList.remove('active');
+                    }
+                    
+                    impactContent.style.display = 'block';
+                    confidenceContent.style.display = 'none';
+                    gsap.fromTo(impactContent, { opacity: 0 }, { opacity: 1, duration: 0.3 });
+                }});
+            }, 600);
+            
+            return;
+        }
+        
+        // Show loading state
+        skeleton.style.display = 'flex';
+        
+        try {
+            const response = await apiRequest('/explain-prediction', {
+                method: 'POST',
+                body: featureInput
+            });
+            
+            if (response.status !== 'success' || !response.explanation) {
+                throw new Error(response.message || 'Explanation failed');
+            }
+            
+            const explanation = response.explanation;
+            
+            // Loading complete transitions
+            gsap.to(skeleton, { opacity: 0, duration: 0.15, onComplete: () => {
+                skeleton.style.display = 'none';
+                renderIntelligenceUI(explanation);
+                
+                // Reset tab header to Tab 1
+                if (tabFeatureImpactBtn && tabModelConfidenceBtn) {
+                    tabFeatureImpactBtn.classList.add('active');
+                    tabModelConfidenceBtn.classList.remove('active');
+                }
+                
+                impactContent.style.display = 'block';
+                confidenceContent.style.display = 'none';
+                gsap.fromTo(impactContent, { opacity: 0 }, { opacity: 1, duration: 0.3 });
+            }});
+            
+        } catch (error) {
+            console.error('[SHAP] Explanation failed:', error);
+            gsap.to(skeleton, { opacity: 0, duration: 0.15, onComplete: () => {
+                skeleton.style.display = 'none';
+                errorState.style.display = 'flex';
+                gsap.fromTo(errorState, { opacity: 0 }, { opacity: 1, duration: 0.3 });
+            }});
+        }
+    }
 
     form.addEventListener('submit', async (event) => {
         event.preventDefault();
@@ -1914,6 +2288,15 @@ function initAnalyzePage() {
         document.getElementById('predInvocations').textContent = formatNumber(monthlyInvocations);
         predictionPanel.removeAttribute('hidden');
         predictionPanel.style.display = 'block';
+
+        const featureInput = {
+            connectionId: session.connectionId,
+            functionName,
+            model: activeModel,
+            baselineRph
+        };
+        const isSimulated = (mode === 'demo');
+        loadPredictionExplanation(featureInput, isSimulated);
 
         if (mode === 'live') {
             setBanner(hint, 'ok', 'Function analysis complete. Use spike simulator for event forecasting.');
@@ -2212,7 +2595,17 @@ function initDashboardPage() {
 
         try {
             const forecastInfo = getStoredJson(GREENLAMBDA_KEYS.forecast) || {};
-            const activeBaseline = forecastInfo.predictedReqPerHour || forecastInfo.baselineRph || 10000;
+            let activeBaseline = 10000;
+            if (forecastInfo && forecastInfo.functionName === functionName) {
+                activeBaseline = forecastInfo.predictedReqPerHour || forecastInfo.baselineRph || 10000;
+            } else {
+                // Deterministic baseline generation for this specific function name so they differ
+                let hash = 0;
+                for (let i = 0; i < functionName.length; i++) {
+                    hash = functionName.charCodeAt(i) + ((hash << 5) - hash);
+                }
+                activeBaseline = 8000 + (Math.abs(hash) % 18) * 1000; // between 8000 and 25000 RPH
+            }
             
             response = await apiRequest(`/live-metrics?${toQuery({
                 connectionId: session.connectionId,
@@ -2221,7 +2614,17 @@ function initDashboardPage() {
             })}`);
         } catch (error) {
             mode = 'demo';
-            const predicted = getStoredJson(GREENLAMBDA_KEYS.forecast)?.predictedReqPerHour || 200000;
+            const forecastInfo = getStoredJson(GREENLAMBDA_KEYS.forecast) || {};
+            let predicted = 200000;
+            if (forecastInfo && forecastInfo.functionName === functionName) {
+                predicted = forecastInfo.predictedReqPerHour || 200000;
+            } else {
+                let hash = 0;
+                for (let i = 0; i < functionName.length; i++) {
+                    hash = functionName.charCodeAt(i) + ((hash << 5) - hash);
+                }
+                predicted = 150000 + (Math.abs(hash) % 21) * 10000; // between 150000 and 350000 RPH
+            }
             response = createDemoLiveMetrics(predicted);
             setBanner(hint, 'warn', `Backend unavailable (${error.message}). Showing demo live metrics.`);
         }
@@ -2284,6 +2687,7 @@ function initDashboardPage() {
         refreshLiveMetrics();
     }
     resetAutoRefresh();
+    loadGlobalImportance();
 }
 
 /* --- Optimization Alerts Logic --- */
@@ -2678,3 +3082,250 @@ if (document.readyState === 'loading') {
 } else {
     checkAuthStatus();
 }
+
+/* ==========================================================================
+   MODEL INTELLIGENCE (SHAP GLOBAL FEATURE IMPORTANCE)
+   ========================================================================== */
+
+const RAW_FEATURE_NAME_MAP = {
+    'memory_config_mb': 'Provisioned Memory (MB)',
+    'cold_start': 'Cold Start Event',
+    'lines_of_code': 'Source Lines of Code (LOC)',
+    'num_loops': 'Loop Instruction Count',
+    'num_conditionals': 'Conditional Branches',
+    'num_function_calls': 'Function Calls',
+    'cyclomatic_complexity': 'Cyclomatic Complexity',
+    'max_nesting_depth': 'Max Code Nesting Depth',
+    'local_duration_ms': 'Local Execution Time (ms)',
+    'local_cpu_percent': 'Local CPU Utilization (%)',
+    'local_memory_mb': 'Local Memory Footprint (MB)',
+    'aws_duration_ms': 'AWS Execution Duration (ms)',
+    'aws_memory_used_mb': 'AWS Max Memory Used (MB)',
+    'duration_ratio': 'AWS to Local Duration Ratio',
+    'memory_efficiency': 'Memory Config Efficiency',
+    'calibration_ratio': 'Calibration Ratio Constant',
+    'function_name_array-operations': 'Func: Array Operations',
+    'function_name_bubble-sort': 'Func: Bubble Sort',
+    'function_name_csv-processor': 'Func: CSV Processor',
+    'function_name_data-transform': 'Func: Data Transform',
+    'function_name_dict-builder': 'Func: Dictionary Builder',
+    'function_name_fibonacci': 'Func: Fibonacci',
+    'function_name_file-reader': 'Func: File Reader',
+    'function_name_json-parser': 'Func: JSON Parser',
+    'function_name_list-comprehension': 'Func: List Comprehension',
+    'function_name_matrix-multiply': 'Func: Matrix Multiply',
+    'function_name_prime-calculator': 'Func: Prime Calculator',
+    'function_name_simple-encryption': 'Func: Simple Encryption',
+    'function_name_string-concat': 'Func: String Concat',
+    'function_name_url-validator': 'Func: URL Validator',
+    'function_type_io': 'Type: I/O Bound',
+    'function_type_memory': 'Type: Memory Intensive',
+    'input_size_Medium': 'Input Size: Medium',
+    'input_size_Small': 'Input Size: Small'
+};
+
+function getHumanReadableFeatureName(rawName) {
+    if (RAW_FEATURE_NAME_MAP[rawName]) {
+        return RAW_FEATURE_NAME_MAP[rawName];
+    }
+    // Fallback: replace underscores/dashes with spaces and capitalize
+    return rawName
+        .replace(/[_-]/g, ' ')
+        .split(' ')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+}
+
+let globalImportanceChartInstance = null;
+
+async function loadGlobalImportance() {
+    console.log("[SHAP] loadGlobalImportance called");
+    const loadingEl = document.getElementById('modelShapLoading');
+    const errorEl = document.getElementById('modelShapError');
+    const loadedEl = document.getElementById('modelShapLoaded');
+    const listEl = document.getElementById('shapRankedList');
+    const canvas = document.getElementById('globalImportanceChart');
+
+    if (!loadingEl || !errorEl || !loadedEl || !listEl || !canvas) {
+        console.warn("[SHAP] Missing required elements in DOM for SHAP global importance.");
+        return;
+    }
+
+    // Toggle Loading State
+    loadingEl.style.display = 'flex';
+    errorEl.style.display = 'none';
+    loadedEl.style.display = 'none';
+
+    try {
+        const payload = await apiRequest('/global-importance');
+        
+        if (payload.status !== 'success' || !payload.global_importance || !Array.isArray(payload.global_importance.ranked)) {
+            throw new Error(payload.message || 'Invalid server response structure');
+        }
+
+        const ranked = payload.global_importance.ranked;
+        const top10 = ranked.slice(0, 10);
+        const maxVal = top10.length > 0 ? top10[0].importance : 1;
+
+        // 1. Render Ranked List on the Right
+        listEl.innerHTML = '';
+        top10.forEach((item, index) => {
+            const rank = index + 1;
+            const readableName = getHumanReadableFeatureName(item.feature);
+            const relativePct = maxVal > 0 ? (item.importance / maxVal) * 100 : 0;
+            
+            // Define color codes depending on rank
+            let rankColorHex = 'rgba(255, 255, 255, 0.6)';
+            if (rank === 1) {
+                rankColorHex = '#c8ff00'; // --accent
+            } else if (rank === 2 || rank === 3) {
+                rankColorHex = '#00f0ff'; // --accent-2
+            }
+
+            const itemEl = document.createElement('div');
+            itemEl.className = 'shap-list-item';
+            itemEl.style.cssText = `
+                display: flex;
+                flex-direction: column;
+                gap: 0.25rem;
+                background: rgba(255, 255, 255, 0.02);
+                border: 1px solid var(--border);
+                border-radius: 8px;
+                padding: 0.6rem 0.8rem;
+                transition: all 0.25s var(--ease);
+            `;
+            
+            itemEl.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; width: 100%;">
+                    <div style="display: flex; align-items: center; gap: 0.5rem; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; max-width: 75%;">
+                        <span style="font-family: var(--mono); font-weight: 700; color: ${rankColorHex}; font-size: 0.82rem;">#${rank}</span>
+                        <span style="font-size: 0.8rem; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis;" title="${readableName}">${readableName}</span>
+                    </div>
+                    <span style="font-family: var(--mono); font-size: 0.72rem; color: var(--text-2); font-weight: 500;">${item.importance.toFixed(5)}</span>
+                </div>
+                <div style="width: 100%; height: 4px; background: rgba(255, 255, 255, 0.03); border-radius: 100px; overflow: hidden; margin-top: 0.15rem;">
+                    <div style="width: ${relativePct}%; height: 100%; background: ${rankColorHex}; border-radius: 100px; transition: width 0.8s var(--ease);"></div>
+                </div>
+            `;
+            listEl.appendChild(itemEl);
+        });
+
+        // 2. Render Chart.js on the Left
+        const labels = top10.map(item => getHumanReadableFeatureName(item.feature));
+        const dataValues = top10.map(item => item.importance);
+
+        if (globalImportanceChartInstance) {
+            globalImportanceChartInstance.destroy();
+        }
+
+        const ctx = canvas.getContext('2d');
+        globalImportanceChartInstance = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: dataValues,
+                    backgroundColor: '#7b61ff', // --purple base
+                    hoverBackgroundColor: '#c8ff00', // --accent highlight
+                    borderRadius: 4,
+                    borderSkipped: false
+                }]
+            },
+            options: {
+                indexAxis: 'y', // horizontal bar
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        backgroundColor: '#161616',
+                        titleColor: '#f0f0f0',
+                        bodyColor: '#8a8a8a',
+                        borderColor: 'rgba(255, 255, 255, 0.08)',
+                        borderWidth: 1,
+                        titleFont: {
+                            family: 'Inter',
+                            size: 11,
+                            weight: 'bold'
+                        },
+                        bodyFont: {
+                            family: 'JetBrains Mono',
+                            size: 10
+                        },
+                        callbacks: {
+                            label: function(context) {
+                                return `Importance: ${context.parsed.x.toFixed(6)}`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: {
+                            color: 'rgba(255, 255, 255, 0.6)',
+                            font: {
+                                family: 'JetBrains Mono',
+                                size: 8
+                            }
+                        },
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.05)',
+                            drawBorder: false
+                        }
+                    },
+                    y: {
+                        ticks: {
+                            color: 'rgba(255, 255, 255, 0.6)',
+                            font: {
+                                family: 'Inter',
+                                size: 9,
+                                weight: '500'
+                            }
+                        },
+                        grid: {
+                            display: false
+                        }
+                    }
+                },
+                animation: {
+                    duration: 800,
+                    easing: 'easeOutQuart'
+                }
+            }
+        });
+
+        // Toggle Loaded State
+        loadingEl.style.display = 'none';
+        loadedEl.style.display = 'block';
+
+    } catch (err) {
+        console.error("[SHAP] loadGlobalImportance error:", err);
+        // Show Error State
+        loadingEl.style.display = 'none';
+        errorEl.style.display = 'flex';
+    }
+}
+
+// --- Start heartbeat monitoring to keep Flask server alive ---
+(function() {
+    function sendHeartbeat() {
+        const base = typeof getApiBase === 'function' ? getApiBase() : 'http://127.0.0.1:5000';
+        fetch(`${base}/api/heartbeat`, {
+            method: 'POST',
+            mode: 'cors',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ timestamp: Date.now() })
+        }).catch(err => {
+            // Silence heartbeat errors to avoid console cluttering when backend is shutting down
+        });
+    }
+    // Send heartbeat immediately on load, then every 3 seconds
+    sendHeartbeat();
+    setInterval(sendHeartbeat, 3000);
+})();
+
+
