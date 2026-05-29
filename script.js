@@ -1848,43 +1848,73 @@ function initAnalyzePage() {
     // Tab switching logic for Prediction Intelligence Card
     const tabFeatureImpactBtn = document.getElementById('tabFeatureImpactBtn');
     const tabModelConfidenceBtn = document.getElementById('tabModelConfidenceBtn');
+    const tabXaiComparisonBtn = document.getElementById('tabXaiComparisonBtn');
     const tabFeatureImpactContent = document.getElementById('tabFeatureImpactContent');
     const tabModelConfidenceContent = document.getElementById('tabModelConfidenceContent');
+    const tabXaiComparisonContent = document.getElementById('tabXaiComparisonContent');
     
-    if (tabFeatureImpactBtn && tabModelConfidenceBtn && tabFeatureImpactContent && tabModelConfidenceContent) {
-        tabFeatureImpactBtn.addEventListener('click', () => {
-            tabFeatureImpactBtn.classList.add('active');
+    if (tabFeatureImpactBtn && tabModelConfidenceBtn && tabXaiComparisonBtn && 
+        tabFeatureImpactContent && tabModelConfidenceContent && tabXaiComparisonContent) {
+        
+        const hideAllTabs = (callback) => {
+            const activeBtn = [tabFeatureImpactBtn, tabModelConfidenceBtn, tabXaiComparisonBtn].find(b => b && b.classList.contains('active'));
+            const activeContent = activeBtn === tabFeatureImpactBtn ? tabFeatureImpactContent :
+                                 activeBtn === tabModelConfidenceBtn ? tabModelConfidenceContent :
+                                 tabXaiComparisonContent;
+                                 
+            tabFeatureImpactBtn.classList.remove('active');
             tabModelConfidenceBtn.classList.remove('active');
+            tabXaiComparisonBtn.classList.remove('active');
             
-            // GSAP smooth opacity switch
-            gsap.to(tabModelConfidenceContent, { opacity: 0, duration: 0.15, onComplete: () => {
-                tabModelConfidenceContent.style.display = 'none';
+            if (activeContent) {
+                gsap.to(activeContent, { opacity: 0, duration: 0.15, onComplete: () => {
+                    tabFeatureImpactContent.style.display = 'none';
+                    tabModelConfidenceContent.style.display = 'none';
+                    tabXaiComparisonContent.style.display = 'none';
+                    callback();
+                }});
+            } else {
+                callback();
+            }
+        };
+        
+        tabFeatureImpactBtn.addEventListener('click', () => {
+            hideAllTabs(() => {
+                tabFeatureImpactBtn.classList.add('active');
                 tabFeatureImpactContent.style.display = 'block';
                 gsap.fromTo(tabFeatureImpactContent, { opacity: 0 }, { opacity: 1, duration: 0.25 });
-            }});
+            });
         });
         
         tabModelConfidenceBtn.addEventListener('click', () => {
-            tabModelConfidenceBtn.classList.add('active');
-            tabFeatureImpactBtn.classList.remove('active');
-            
-            // GSAP smooth opacity switch
-            gsap.to(tabFeatureImpactContent, { opacity: 0, duration: 0.15, onComplete: () => {
-                tabFeatureImpactContent.style.display = 'none';
+            hideAllTabs(() => {
+                tabModelConfidenceBtn.classList.add('active');
                 tabModelConfidenceContent.style.display = 'flex';
                 gsap.fromTo(tabModelConfidenceContent, { opacity: 0 }, { opacity: 1, duration: 0.25 });
-            }});
+            });
+        });
+        
+        tabXaiComparisonBtn.addEventListener('click', () => {
+            hideAllTabs(() => {
+                tabXaiComparisonBtn.classList.add('active');
+                tabXaiComparisonContent.style.display = 'block';
+                gsap.fromTo(tabXaiComparisonContent, { opacity: 0 }, { opacity: 1, duration: 0.25 });
+            });
         });
     }
 
-    function renderIntelligenceUI(explanation) {
+    let currentShapExplanation = null;
+    let currentLimeExplanation = null;
+    let activeFeatureImpactMethod = 'shap';
+    let activeModelConfidenceMethod = 'shap';
+
+    function renderFeatureImpact(method) {
+        const explanation = method === 'shap' ? currentShapExplanation : currentLimeExplanation;
+        if (!explanation) return;
+        
         const topFeatures = explanation.top_features || [];
         
         // Wh to mWh conversion (1 Wh = 1000 mWh)
-        const baseValueMwh = explanation.base_value * 1000;
-        const predictedValueMwh = explanation.predicted_value * 1000;
-        
-        // 1. Populate Tab 1 Horizontal Bar Chart
         const localExplanationChartCanvas = document.getElementById('localExplanationChart');
         if (localExplanationChartCanvas) {
             if (localExplanationChartInstance) {
@@ -1893,7 +1923,10 @@ function initAnalyzePage() {
             }
             
             const labels = topFeatures.map(item => getHumanReadableFeatureName(item.feature));
-            const dataValues = topFeatures.map(item => item.shap_value * 1000);
+            const dataValues = topFeatures.map(item => {
+                const val = method === 'shap' ? item.shap_value : item.lime_weight;
+                return val * 1000;
+            });
             const barColors = dataValues.map(val => val >= 0 ? '#ff3d71' : '#36f9ae');
             
             const ctx = localExplanationChartCanvas.getContext('2d');
@@ -1943,14 +1976,15 @@ function initAnalyzePage() {
             });
         }
         
-        // 2. Populate Tab 1 Ranked Impact Summary Cards
+        // Populate Tab 1 Ranked Impact Summary Cards
         const localImpactList = document.getElementById('localImpactList');
         if (localImpactList) {
             localImpactList.innerHTML = '';
             
             topFeatures.forEach((item, index) => {
                 const readableName = getHumanReadableFeatureName(item.feature);
-                const valMwh = item.shap_value * 1000;
+                const rawVal = method === 'shap' ? item.shap_value : item.lime_weight;
+                const valMwh = rawVal * 1000;
                 const isPositive = valMwh >= 0;
                 const directionText = isPositive ? '↑ Increases Energy' : '↓ Reduces Energy';
                 const directionColor = isPositive ? 'var(--red)' : 'var(--green)';
@@ -1999,8 +2033,19 @@ function initAnalyzePage() {
                 ease: 'power2.out'
             });
         }
+    }
+    
+    function renderModelConfidence(method) {
+        const explanation = method === 'shap' ? currentShapExplanation : currentLimeExplanation;
+        if (!explanation) return;
         
-        // 3. Populate Tab 2 Model Confidence
+        const topFeatures = explanation.top_features || [];
+        
+        // Base and predicted value in Wh, convert to mWh
+        // Note: SHAP baseline is explanation.base_value; LIME baseline is explanation.intercept
+        const baseValueMwh = (method === 'shap' ? explanation.base_value : (explanation.intercept || 0.0)) * 1000;
+        const predictedValueMwh = (explanation.predicted_value || 0.0) * 1000;
+        
         const confBaseValue = document.getElementById('confBaseValue');
         const confPredictedValue = document.getElementById('confPredictedValue');
         const flowSegmentBase = document.getElementById('flowSegmentBase');
@@ -2016,7 +2061,7 @@ function initAnalyzePage() {
             let totalNeg = 0;
             
             topFeatures.forEach(item => {
-                const val = item.shap_value * 1000;
+                const val = (method === 'shap' ? item.shap_value : item.lime_weight) * 1000;
                 if (val >= 0) totalPos += val;
                 else totalNeg += Math.abs(val);
             });
@@ -2046,7 +2091,147 @@ function initAnalyzePage() {
                 driverText += `, with <strong>${topCodeDriver}</strong> as the chief code-level driver`;
             }
             
-            confExplanationSummary.innerHTML = `Your function's energy consumption is <strong style="color: ${diffPct >= 0 ? 'var(--red)' : 'var(--green)'};">${absoluteDiffPct}% ${relationshipWord}</strong> than the model baseline, ${driverText}.`;
+            const methodLabel = method.toUpperCase();
+            confExplanationSummary.innerHTML = `Based on <strong>${methodLabel}</strong> attribution, your function's energy consumption is <strong style="color: ${diffPct >= 0 ? 'var(--red)' : 'var(--green)'};">${absoluteDiffPct}% ${relationshipWord}</strong> than the model baseline (${method === 'shap' ? 'base value' : 'LIME intercept'}), ${driverText}.`;
+        }
+    }
+    
+    function wireXaiToggles() {
+        const toggleGroups = document.querySelectorAll('.xai-toggle-group');
+        toggleGroups.forEach(group => {
+            const target = group.dataset.target; // 'feature-impact' or 'model-confidence'
+            const buttons = group.querySelectorAll('.xai-toggle-btn');
+            
+            buttons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const method = btn.dataset.method; // 'shap' or 'lime'
+                    
+                    // If LIME is requested but not loaded yet, do not trigger
+                    if (method === 'lime' && !currentLimeExplanation) {
+                        return;
+                    }
+                    
+                    // Remove active class from all buttons in this group
+                    buttons.forEach(b => b.classList.remove('active'));
+                    // Add active class to this button
+                    btn.classList.add('active');
+                    
+                    if (target === 'feature-impact') {
+                        activeFeatureImpactMethod = method;
+                        renderFeatureImpact(method);
+                    } else if (target === 'model-confidence') {
+                        activeModelConfidenceMethod = method;
+                        renderModelConfidence(method);
+                    }
+                });
+            });
+        });
+    }
+    
+    wireXaiToggles();
+
+    function renderXaiComparisonUI(shapExplanation, limeExplanation) {
+        const tableBody = document.getElementById('xaiComparisonTableBody');
+        const scoreSpan = document.getElementById('limeAgreementScore');
+        const badge = document.getElementById('limeAgreementBadge');
+        const summaryText = document.getElementById('limeComparisonSummaryText');
+        
+        if (!tableBody || !scoreSpan || !badge || !summaryText) return;
+        
+        // 1. Combine SHAP and LIME values
+        const featuresCombined = [];
+        const shapFeatureNames = shapExplanation.feature_names || [];
+        const shapValues = shapExplanation.shap_values || [];
+        
+        for (let i = 0; i < shapFeatureNames.length; i++) {
+            const name = shapFeatureNames[i];
+            const shapVal = shapValues[i] || 0.0;
+            
+            // Find matching LIME weight
+            const limeIdx = limeExplanation.feature_names.indexOf(name);
+            const limeWeight = limeIdx !== -1 ? limeExplanation.lime_weights[limeIdx] : 0.0;
+            
+            featuresCombined.push({
+                name: name,
+                shapVal: shapVal,
+                limeWeight: limeWeight
+            });
+        }
+        
+        // Sort descending by absolute SHAP impact
+        featuresCombined.sort((a, b) => Math.abs(b.shapVal) - Math.abs(a.shapVal));
+        
+        // Take top 10
+        const top10 = featuresCombined.slice(0, 10);
+        
+        // 2. Compute Agreement Score
+        let agreements = 0;
+        top10.forEach(item => {
+            const shapPos = item.shapVal >= 0;
+            const limePos = item.limeWeight >= 0;
+            if (shapPos === limePos) {
+                agreements++;
+            }
+        });
+        
+        // Render Table Body
+        tableBody.innerHTML = '';
+        top10.forEach((item, index) => {
+            const readableName = getHumanReadableFeatureName(item.name);
+            const shapMwh = item.shapVal * 1000;
+            const shapFormatted = (shapMwh >= 0 ? '+' : '') + shapMwh.toFixed(3);
+            const limeMwh = item.limeWeight * 1000;
+            const limeFormatted = (limeMwh >= 0 ? '+' : '') + limeMwh.toFixed(3);
+            
+            const shapPos = item.shapVal >= 0;
+            const limePos = item.limeWeight >= 0;
+            const agree = (shapPos === limePos);
+            
+            const tr = document.createElement('tr');
+            tr.style.borderBottom = '1px solid var(--border)';
+            tr.style.background = index % 2 === 0 ? 'rgba(255, 255, 255, 0.01)' : 'transparent';
+            
+            const agreementMarkup = agree 
+                ? `<span style="color: var(--green); font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 0.25rem;">✓ Agree</span>`
+                : `<span style="color: var(--red); font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 0.25rem;">✗ Disagree</span>`;
+                
+            tr.innerHTML = `
+                <td style="padding: 0.65rem 1rem; font-weight: 500; color: var(--text);">${readableName}</td>
+                <td style="padding: 0.65rem 1rem; text-align: right; font-family: var(--mono); color: ${shapMwh >= 0 ? 'var(--red)' : 'var(--green)'};">${shapFormatted}</td>
+                <td style="padding: 0.65rem 1rem; text-align: right; font-family: var(--mono); color: ${limeMwh >= 0 ? 'var(--red)' : 'var(--green)'};">${limeFormatted}</td>
+                <td style="padding: 0.65rem 1rem; text-align: center;">${agreementMarkup}</td>
+            `;
+            tableBody.appendChild(tr);
+        });
+        
+        // Update Agreement Score displays
+        scoreSpan.textContent = `${agreements}/10`;
+        
+        // Style Badge
+        badge.style.display = 'inline-block';
+        if (agreements >= 8) {
+            badge.textContent = 'Strong Agreement';
+            badge.style.background = 'rgba(54, 249, 174, 0.12)';
+            badge.style.color = 'var(--green)';
+            badge.style.border = '1px solid var(--green)';
+        } else if (agreements >= 5) {
+            badge.textContent = 'Moderate Agreement';
+            badge.style.background = 'rgba(255, 194, 51, 0.12)';
+            badge.style.color = 'var(--amber)';
+            badge.style.border = '1px solid var(--amber)';
+        } else {
+            badge.textContent = 'Low Agreement';
+            badge.style.background = 'rgba(255, 61, 113, 0.12)';
+            badge.style.color = 'var(--red)';
+            badge.style.border = '1px solid var(--red)';
+        }
+        
+        // Summary Text
+        const topDriverName = top10.length > 0 ? getHumanReadableFeatureName(top10[0].name) : 'unknown feature';
+        if (agreements >= 8) {
+            summaryText.innerHTML = `Both SHAP and LIME identify <strong>${topDriverName}</strong> as the primary driver of this prediction, confirming model interpretability.`;
+        } else {
+            summaryText.innerHTML = `SHAP and LIME show different explanations for this prediction, suggesting high feature interaction effects.`;
         }
     }
 
@@ -2055,18 +2240,28 @@ function initAnalyzePage() {
         const errorState = document.getElementById('intelErrorState');
         const impactContent = document.getElementById('tabFeatureImpactContent');
         const confidenceContent = document.getElementById('tabModelConfidenceContent');
+        const comparisonContent = document.getElementById('tabXaiComparisonContent');
         const simulationBadge = document.getElementById('simulationBadge');
         const card = document.getElementById('predictionIntelligenceCard');
         
-        if (!skeleton || !errorState || !impactContent || !confidenceContent) return;
+        const limeSkeleton = document.getElementById('limeLoadingSkeleton');
+        const limeError = document.getElementById('limeErrorState');
+        const limeCompareContent = document.getElementById('limeCompareContent');
+        
+        if (!skeleton || !errorState || !impactContent || !confidenceContent || !comparisonContent) return;
         
         // Reset display states
         skeleton.style.display = 'none';
         errorState.style.display = 'none';
         impactContent.style.display = 'none';
         confidenceContent.style.display = 'none';
+        comparisonContent.style.display = 'none';
         if (simulationBadge) simulationBadge.style.display = 'none';
         if (card) card.style.display = 'block';
+        
+        if (limeSkeleton) limeSkeleton.style.display = 'flex';
+        if (limeError) limeError.style.display = 'none';
+        if (limeCompareContent) limeCompareContent.style.display = 'none';
         
         if (isSimulated) {
             if (simulationBadge) simulationBadge.style.display = 'inline-block';
@@ -2074,59 +2269,105 @@ function initAnalyzePage() {
             // Show loading state briefly for a premium micro-animation feel
             skeleton.style.display = 'flex';
             
+            const fnName = featureInput.functionName || 'bubble-sort';
+            const modelName = featureInput.model || 'xgboost';
+            
+            let hash = 0;
+            for (let i = 0; i < fnName.length; i++) {
+                hash = fnName.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            
+            let modelFactor = 1.0;
+            if (modelName === 'rf') {
+                modelFactor = 1.03;
+            } else if (modelName === 'nn') {
+                modelFactor = 0.97;
+            }
+            
+            // Base values matching the real dataset baseline
+            const baseEnergyMwh = 2400 + (Math.abs(hash) % 12) * 150;
+            const predictedEnergyMwh = baseEnergyMwh * modelFactor * (0.92 + (Math.abs(hash * 3) % 15) / 100);
+            const diffMwh = predictedEnergyMwh - baseEnergyMwh;
+            
+            // Distribute SHAP values deterministically
+            const memoryVal = diffMwh * 0.72;
+            const locVal = diffMwh * 0.15;
+            const typeVal = diffMwh * 0.08;
+            const durVal = diffMwh * 0.05;
+            
+            const mockSHAP = [
+                { feature: 'local_memory_mb', shap_value: memoryVal / 1000, direction: memoryVal >= 0 ? 'increases' : 'decreases' },
+                { feature: 'lines_of_code', shap_value: locVal / 1000, direction: locVal >= 0 ? 'increases' : 'decreases' },
+                { feature: 'function_type_memory', shap_value: typeVal / 1000, direction: typeVal >= 0 ? 'increases' : 'decreases' },
+                { feature: 'local_duration_ms', shap_value: durVal / 1000, direction: durVal >= 0 ? 'increases' : 'decreases' },
+                { feature: 'cyclomatic_complexity', shap_value: (diffMwh * 0.01) / 1000, direction: diffMwh >= 0 ? 'increases' : 'decreases' }
+            ];
+            
+            // Sort by absolute value
+            mockSHAP.sort((a, b) => Math.abs(b.shap_value) - Math.abs(a.shap_value));
+            
+            const explanation = {
+                base_value: baseEnergyMwh / 1000,
+                predicted_value: predictedEnergyMwh / 1000,
+                top_features: mockSHAP,
+                feature_names: ['local_memory_mb', 'lines_of_code', 'function_type_memory', 'local_duration_ms', 'cyclomatic_complexity'],
+                shap_values: [memoryVal / 1000, locVal / 1000, typeVal / 1000, durVal / 1000, (diffMwh * 0.01) / 1000]
+            };
+            
+            const mockLimeIntercept = (baseEnergyMwh * 1.08) / 1000;
+            const diffLIME = (predictedEnergyMwh / 1000) - mockLimeIntercept;
+            
+            // Generate mock LIME explanation with mathematically consistent weights summing to prediction - intercept
+            const mockLIME = {
+                feature_names: ['local_memory_mb', 'lines_of_code', 'function_type_memory', 'local_duration_ms', 'cyclomatic_complexity'],
+                lime_weights: [
+                    diffLIME * 0.70,
+                    diffLIME * 0.15,
+                    diffLIME * 0.08,
+                    diffLIME * 0.05,
+                    diffLIME * 0.02
+                ],
+                predicted_value: predictedEnergyMwh / 1000,
+                intercept: mockLimeIntercept
+            };
+            mockLIME.top_features = mockLIME.feature_names.map((name, i) => ({
+                feature: name,
+                lime_weight: mockLIME.lime_weights[i],
+                direction: mockLIME.lime_weights[i] >= 0 ? 'increases' : 'decreases'
+            })).sort((a, b) => Math.abs(b.lime_weight) - Math.abs(a.lime_weight));
+            
+            // State updates for simulation mode
+            currentShapExplanation = explanation;
+            currentLimeExplanation = null; // will be filled in 1800ms
+            activeFeatureImpactMethod = 'shap';
+            activeModelConfidenceMethod = 'shap';
+
+            // Reset toggle buttons visually to SHAP active, disable LIME buttons during loading
+            const resetToggleUI = () => {
+                const limeButtons = document.querySelectorAll('.xai-toggle-btn[data-method="lime"]');
+                limeButtons.forEach(btn => {
+                    btn.style.opacity = '0.5';
+                    btn.style.pointerEvents = 'none';
+                    btn.title = 'LIME is loading...';
+                    btn.classList.remove('active');
+                });
+                const shapButtons = document.querySelectorAll('.xai-toggle-btn[data-method="shap"]');
+                shapButtons.forEach(btn => {
+                    btn.classList.add('active');
+                });
+            };
+            resetToggleUI();
+
             setTimeout(() => {
-                // Generate deterministic mock SHAP values for Simulation Mode
-                // based on the functionName and model selected so they are beautifully distinct!
-                const fnName = featureInput.functionName || 'bubble-sort';
-                const modelName = featureInput.model || 'xgboost';
-                
-                let hash = 0;
-                for (let i = 0; i < fnName.length; i++) {
-                    hash = fnName.charCodeAt(i) + ((hash << 5) - hash);
-                }
-                
-                let modelFactor = 1.0;
-                if (modelName === 'rf') {
-                    modelFactor = 1.03;
-                } else if (modelName === 'nn') {
-                    modelFactor = 0.97;
-                }
-                
-                // Base values matching the real dataset baseline
-                const baseEnergyMwh = 2400 + (Math.abs(hash) % 12) * 150;
-                const predictedEnergyMwh = baseEnergyMwh * modelFactor * (0.92 + (Math.abs(hash * 3) % 15) / 100);
-                const diffMwh = predictedEnergyMwh - baseEnergyMwh;
-                
-                // Distribute SHAP values deterministically
-                const memoryVal = diffMwh * 0.72;
-                const locVal = diffMwh * 0.15;
-                const typeVal = diffMwh * 0.08;
-                const durVal = diffMwh * 0.05;
-                
-                const mockSHAP = [
-                    { feature: 'local_memory_mb', shap_value: memoryVal / 1000, direction: memoryVal >= 0 ? 'increases' : 'decreases' },
-                    { feature: 'lines_of_code', shap_value: locVal / 1000, direction: locVal >= 0 ? 'increases' : 'decreases' },
-                    { feature: 'function_type_memory', shap_value: typeVal / 1000, direction: typeVal >= 0 ? 'increases' : 'decreases' },
-                    { feature: 'local_duration_ms', shap_value: durVal / 1000, direction: durVal >= 0 ? 'increases' : 'decreases' },
-                    { feature: 'cyclomatic_complexity', shap_value: (diffMwh * 0.01) / 1000, direction: diffMwh >= 0 ? 'increases' : 'decreases' }
-                ];
-                
-                // Sort by absolute value
-                mockSHAP.sort((a, b) => Math.abs(b.shap_value) - Math.abs(a.shap_value));
-                
-                const explanation = {
-                    base_value: baseEnergyMwh / 1000,
-                    predicted_value: predictedEnergyMwh / 1000,
-                    top_features: mockSHAP
-                };
-                
                 gsap.to(skeleton, { opacity: 0, duration: 0.15, onComplete: () => {
                     skeleton.style.display = 'none';
-                    renderIntelligenceUI(explanation);
+                    renderFeatureImpact('shap');
+                    renderModelConfidence('shap');
                     
-                    if (tabFeatureImpactBtn && tabModelConfidenceBtn) {
+                    if (tabFeatureImpactBtn && tabModelConfidenceBtn && tabXaiComparisonBtn) {
                         tabFeatureImpactBtn.classList.add('active');
                         tabModelConfidenceBtn.classList.remove('active');
+                        tabXaiComparisonBtn.classList.remove('active');
                     }
                     
                     impactContent.style.display = 'block';
@@ -2135,48 +2376,147 @@ function initAnalyzePage() {
                 }});
             }, 600);
             
+            setTimeout(() => {
+                currentLimeExplanation = mockLIME;
+                
+                // Enable LIME toggle buttons
+                const limeButtons = document.querySelectorAll('.xai-toggle-btn[data-method="lime"]');
+                limeButtons.forEach(btn => {
+                    btn.style.opacity = '1';
+                    btn.style.pointerEvents = 'auto';
+                    btn.title = 'Switch to LIME';
+                });
+
+                if (limeSkeleton) limeSkeleton.style.display = 'none';
+                if (limeCompareContent) {
+                    renderXaiComparisonUI(explanation, mockLIME);
+                    limeCompareContent.style.display = 'block';
+                }
+            }, 1800);
+            
             return;
         }
         
+        // Reset state for live mode
+        currentShapExplanation = null;
+        currentLimeExplanation = null;
+        activeFeatureImpactMethod = 'shap';
+        activeModelConfidenceMethod = 'shap';
+        
+        // Reset toggle UI to default (SHAP active, LIME disabled/loading)
+        const resetLiveToggleUI = () => {
+            const limeButtons = document.querySelectorAll('.xai-toggle-btn[data-method="lime"]');
+            limeButtons.forEach(btn => {
+                btn.style.opacity = '0.5';
+                btn.style.pointerEvents = 'none';
+                btn.title = 'LIME is loading...';
+                btn.classList.remove('active');
+            });
+            const shapButtons = document.querySelectorAll('.xai-toggle-btn[data-method="shap"]');
+            shapButtons.forEach(btn => {
+                btn.classList.add('active');
+            });
+        };
+        resetLiveToggleUI();
+
         // Show loading state
         skeleton.style.display = 'flex';
         
-        try {
-            const response = await apiRequest('/explain-prediction', {
-                method: 'POST',
-                body: featureInput
-            });
-            
+        let shapExplanationData = null;
+        let limeExplanationData = null;
+        
+        // Fire both calls in parallel
+        const shapPromise = apiRequest('/explain-prediction', {
+            method: 'POST',
+            body: featureInput
+        }).then(response => {
             if (response.status !== 'success' || !response.explanation) {
-                throw new Error(response.message || 'Explanation failed');
+                throw new Error(response.message || 'SHAP Explanation failed');
             }
+            shapExplanationData = response.explanation;
+            currentShapExplanation = shapExplanationData;
             
-            const explanation = response.explanation;
-            
-            // Loading complete transitions
+            // Render SHAP UI immediately when it arrives
             gsap.to(skeleton, { opacity: 0, duration: 0.15, onComplete: () => {
                 skeleton.style.display = 'none';
-                renderIntelligenceUI(explanation);
+                renderFeatureImpact('shap');
+                renderModelConfidence('shap');
                 
-                // Reset tab header to Tab 1
-                if (tabFeatureImpactBtn && tabModelConfidenceBtn) {
+                // Only change active tabs if XAI comparison tab isn't open
+                if (tabFeatureImpactBtn && tabModelConfidenceBtn && tabXaiComparisonBtn && !tabXaiComparisonBtn.classList.contains('active')) {
                     tabFeatureImpactBtn.classList.add('active');
                     tabModelConfidenceBtn.classList.remove('active');
+                    tabXaiComparisonBtn.classList.remove('active');
                 }
                 
-                impactContent.style.display = 'block';
-                confidenceContent.style.display = 'none';
-                gsap.fromTo(impactContent, { opacity: 0 }, { opacity: 1, duration: 0.3 });
+                if (!tabXaiComparisonBtn.classList.contains('active')) {
+                    impactContent.style.display = 'block';
+                    confidenceContent.style.display = 'none';
+                    gsap.fromTo(impactContent, { opacity: 0 }, { opacity: 1, duration: 0.3 });
+                }
             }});
-            
-        } catch (error) {
+            return shapExplanationData;
+        }).catch(error => {
             console.error('[SHAP] Explanation failed:', error);
             gsap.to(skeleton, { opacity: 0, duration: 0.15, onComplete: () => {
                 skeleton.style.display = 'none';
                 errorState.style.display = 'flex';
                 gsap.fromTo(errorState, { opacity: 0 }, { opacity: 1, duration: 0.3 });
             }});
-        }
+            throw error;
+        });
+        
+        const limePromise = apiRequest('/lime-explain', {
+            method: 'POST',
+            body: featureInput
+        }).then(response => {
+            if (response.status !== 'success' || !response.lime_explanation) {
+                throw new Error(response.message || 'LIME Explanation failed');
+            }
+            limeExplanationData = response.lime_explanation;
+            currentLimeExplanation = limeExplanationData;
+            
+            // Enable LIME toggle buttons
+            const limeButtons = document.querySelectorAll('.xai-toggle-btn[data-method="lime"]');
+            limeButtons.forEach(btn => {
+                btn.style.opacity = '1';
+                btn.style.pointerEvents = 'auto';
+                btn.title = 'Switch to LIME';
+            });
+            
+            return limeExplanationData;
+        }).catch(error => {
+            console.error('[LIME] Explanation failed:', error);
+            throw error;
+        });
+        
+        // Wait for both to render Comparison View
+        Promise.all([shapPromise, limePromise]).then(([shapVal, limeVal]) => {
+            if (limeSkeleton) limeSkeleton.style.display = 'none';
+            if (limeError) limeError.style.display = 'none';
+            if (limeCompareContent) {
+                renderXaiComparisonUI(shapVal, limeVal);
+                limeCompareContent.style.display = 'block';
+            }
+        }).catch(err => {
+            // SHAP succeeded but LIME failed or both failed
+            if (limeSkeleton) limeSkeleton.style.display = 'none';
+            if (limeCompareContent) limeCompareContent.style.display = 'none';
+            
+            // Disable LIME toggle buttons visually showing unavailable state
+            const limeButtons = document.querySelectorAll('.xai-toggle-btn[data-method="lime"]');
+            limeButtons.forEach(btn => {
+                btn.style.opacity = '0.3';
+                btn.style.pointerEvents = 'none';
+                btn.title = 'LIME explanation unavailable';
+                btn.classList.remove('active');
+            });
+            
+            // Only show LIME error state if SHAP actually succeeded
+            if (shapExplanationData && limeError) {
+                limeError.style.display = 'flex';
+            }
+        });
     }
 
     form.addEventListener('submit', async (event) => {
@@ -2682,6 +3022,11 @@ function initDashboardPage() {
     fnSelect.addEventListener('change', refreshLiveMetrics);
     refreshIntervalSelect.addEventListener('change', resetAutoRefresh);
     autoToggle.addEventListener('change', resetAutoRefresh);
+
+    const loadLimeGlobalBtn = document.getElementById('loadLimeGlobalBtn');
+    if (loadLimeGlobalBtn) {
+        loadLimeGlobalBtn.addEventListener('click', loadLimeGlobalImportance);
+    }
 
     if (fnSelect.value) {
         refreshLiveMetrics();
@@ -3303,6 +3648,133 @@ async function loadGlobalImportance() {
     } catch (err) {
         console.error("[SHAP] loadGlobalImportance error:", err);
         // Show Error State
+        loadingEl.style.display = 'none';
+        errorEl.style.display = 'flex';
+    }
+}
+
+/* ==========================================================================
+   LIME GLOBAL COMPARISON LOGIC
+   ========================================================================== */
+
+let shapVsLimeChartInstance = null;
+
+async function loadLimeGlobalImportance() {
+    console.log("[LIME] loadLimeGlobalImportance called");
+    const initialEl = document.getElementById('limeGlobalInitialState');
+    const loadingEl = document.getElementById('limeGlobalLoading');
+    const errorEl = document.getElementById('limeGlobalError');
+    const loadedEl = document.getElementById('limeGlobalLoaded');
+    const canvas = document.getElementById('shapVsLimeCompareChart');
+    
+    if (!initialEl || !loadingEl || !errorEl || !loadedEl || !canvas) return;
+    
+    initialEl.style.display = 'none';
+    loadingEl.style.display = 'flex';
+    errorEl.style.display = 'none';
+    loadedEl.style.display = 'none';
+    
+    try {
+        const [shapPayload, limePayload] = await Promise.all([
+            apiRequest('/global-importance'),
+            apiRequest('/lime-global-importance')
+        ]);
+        
+        if (shapPayload.status !== 'success' || !shapPayload.global_importance ||
+            limePayload.status !== 'success' || !limePayload.global_importance) {
+            throw new Error('Invalid global importance response');
+        }
+        
+        const shapRanked = shapPayload.global_importance.ranked;
+        const limeRanked = limePayload.global_importance.ranked;
+        
+        // Find top 10 features based on absolute SHAP importance
+        const top10Features = shapRanked.slice(0, 10).map(item => item.feature);
+        
+        // Build aligned dataset: for each of the top 10 features, get its SHAP and LIME values
+        const labels = top10Features.map(f => getHumanReadableFeatureName(f));
+        
+        const shapImportances = top10Features.map(f => {
+            const match = shapRanked.find(item => item.feature === f);
+            return match ? match.importance : 0.0;
+        });
+        
+        const limeImportances = top10Features.map(f => {
+            const match = limeRanked.find(item => item.feature === f);
+            return match ? match.importance : 0.0;
+        });
+        
+        // Normalize both to [0, 1] relative to their respective maximum values for unified comparison
+        const maxShap = Math.max(...shapImportances) || 1.0;
+        const maxLime = Math.max(...limeImportances) || 1.0;
+        
+        const normalizedShap = shapImportances.map(val => val / maxShap);
+        const normalizedLime = limeImportances.map(val => val / maxLime);
+        
+        if (shapVsLimeChartInstance) {
+            shapVsLimeChartInstance.destroy();
+        }
+        
+        const ctx = canvas.getContext('2d');
+        shapVsLimeChartInstance = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'SHAP (Normalized)',
+                        data: normalizedShap,
+                        backgroundColor: '#7b61ff', // --purple
+                        borderRadius: 4
+                    },
+                    {
+                        label: 'LIME (Normalized)',
+                        data: normalizedLime,
+                        backgroundColor: '#00f0ff', // --accent-2 cyan
+                        borderRadius: 4
+                    }
+                ]
+            },
+            options: {
+                indexAxis: 'y', // horizontal bar
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        labels: { color: 'rgba(255, 255, 255, 0.7)', font: { family: 'Inter', size: 10 } }
+                    },
+                    tooltip: {
+                        backgroundColor: '#161616',
+                        titleColor: '#f0f0f0',
+                        bodyColor: '#8a8a8a',
+                        borderColor: 'rgba(255, 255, 255, 0.08)',
+                        borderWidth: 1,
+                        callbacks: {
+                            label: function(context) {
+                                return `${context.dataset.label}: ${context.parsed.x.toFixed(4)}`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        title: { display: true, text: 'Relative Global Importance', color: 'rgba(255, 255, 255, 0.5)', font: { size: 9 } },
+                        ticks: { color: 'rgba(255, 255, 255, 0.6)', font: { family: 'JetBrains Mono', size: 8 } },
+                        grid: { color: 'rgba(255, 255, 255, 0.05)' }
+                    },
+                    y: {
+                        ticks: { color: 'rgba(255, 255, 255, 0.6)', font: { family: 'Inter', size: 9, weight: '500' } },
+                        grid: { display: false }
+                    }
+                }
+            }
+        });
+        
+        loadingEl.style.display = 'none';
+        loadedEl.style.display = 'block';
+        
+    } catch (err) {
+        console.error("[LIME] loadLimeGlobalImportance error:", err);
         loadingEl.style.display = 'none';
         errorEl.style.display = 'flex';
     }

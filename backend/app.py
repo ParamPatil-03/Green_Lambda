@@ -14,6 +14,8 @@ import numpy as np
 from datetime import datetime, timedelta
 import model_loader
 import shap_explainer
+import lime_explainer
+
 
 app = Flask(__name__)
 CORS(app)
@@ -829,6 +831,172 @@ def get_global_importance_endpoint():
         return jsonify({
             "status": "error",
             "message": f"Internal SHAP error: {str(e)}"
+        }), 500
+
+@app.route('/lime-explain', methods=['POST'])
+def lime_explain_endpoint():
+    """
+    Exposes prediction-level LIME explanations to the frontend.
+    Accepts flat or nested feature JSON and returns ranked contribution weights.
+    
+    Timing Note: LIME takes ~1-2 seconds per prediction due to perturbation.
+    """
+    print("[LIME] lime-explain called")
+    try:
+        data = request.json or {}
+        
+        # Flexibly unwrap nested 'features' structure if present
+        if "features" in data:
+            features = data["features"]
+        else:
+            features = data
+            
+        # Resolve features if functionName/function_name is provided but typical raw features are missing
+        fn_name_input = features.get("functionName") or features.get("function_name")
+        if fn_name_input and any(f not in features for f in ['memory_config_mb', 'lines_of_code', 'num_loops']):
+            # Load static baseline features
+            X_single, row_details = prepare_features(fn_name_input)
+            
+            # Optionally check if there's active session in active_sessions
+            conn_id = data.get('connectionId')
+            creds = active_sessions.get(conn_id, {}) if conn_id else {}
+            access_key = creds.get('accessKeyId')
+            secret_key = creds.get('secretAccessKey')
+            region = creds.get('region', 'ap-south-1')
+            
+            # If credentials found, do live CloudWatch duration/AST profiling
+            live_duration_ms = None
+            if access_key and access_key != "TEST-KEY-123":
+                try:
+                    import boto3
+                    from datetime import datetime, timedelta
+                    cw = boto3.client('cloudwatch', 
+                                      aws_access_key_id=access_key, 
+                                      aws_secret_access_key=secret_key, 
+                                      region_name=region)
+                    
+                    end_time = datetime.utcnow()
+                    start_time = end_time - timedelta(days=14)
+                    cw_res = cw.get_metric_statistics(
+                        Namespace='AWS/Lambda',
+                        MetricName='Duration',
+                        Dimensions=[{'Name': 'FunctionName', 'Value': fn_name_input}],
+                        StartTime=start_time,
+                        EndTime=end_time,
+                        Period=86400,
+                        Statistics=['Average']
+                    )
+                    
+                    if cw_res['Datapoints']:
+                        live_duration_ms = sum(dp['Average'] for dp in cw_res['Datapoints']) / len(cw_res['Datapoints'])
+                        X_single['aws_duration_ms'] = live_duration_ms
+                        
+                    # Radon cc_visit AST
+                    import requests
+                    import tempfile
+                    import zipfile
+                    from radon.complexity import cc_visit
+                    
+                    lb = boto3.client('lambda', 
+                                      aws_access_key_id=access_key, 
+                                      aws_secret_access_key=secret_key, 
+                                      region_name=region)
+                    
+                    fn_info = lb.get_function(FunctionName=fn_name_input)
+                    code_url = fn_info['Code']['Location']
+                    r = requests.get(code_url, timeout=10)
+                    with tempfile.TemporaryDirectory() as tmpdir:
+                        zip_path = os.path.join(tmpdir, 'lambda_code.zip')
+                        with open(zip_path, 'wb') as f:
+                            f.write(r.content)
+                        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                            zip_ref.extractall(tmpdir)
+                        
+                        total_loc = 0
+                        complexities = []
+                        for root, dirs, files in os.walk(tmpdir):
+                            for file in files:
+                                if file.endswith('.py'):
+                                    py_path = os.path.join(root, file)
+                                    with open(py_path, 'r', encoding='utf-8') as pyf:
+                                        content = pyf.read()
+                                        lines = content.splitlines()
+                                        total_loc += len([line for line in lines if line.strip() and not line.strip().startswith('#')])
+                                        try:
+                                            blocks = cc_visit(content)
+                                            if blocks:
+                                                complexities.extend([b.complexity for b in blocks])
+                                        except:
+                                            pass
+                        if total_loc > 0:
+                            X_single['lines_of_code'] = total_loc
+                            if complexities:
+                                X_single['cyclomatic_complexity'] = sum(complexities) / len(complexities)
+                except Exception as live_err:
+                    print(f"Live AWS integration for lime-explain failed: {live_err}")
+            
+            features = X_single.iloc[0].to_dict()
+            
+        # Get required feature list from model_loader
+        req_features = model_loader.get_feature_names()
+        if not req_features:
+            return jsonify({"status": "error", "message": "Feature list not loaded from model_loader."}), 500
+            
+        # Validate that all required features are present
+        raw_features = [
+            'function_name', 'function_type', 'input_size', 'memory_config_mb', 
+            'cold_start', 'lines_of_code', 'num_loops', 'num_conditionals', 
+            'num_function_calls', 'cyclomatic_complexity', 'max_nesting_depth', 
+            'local_duration_ms', 'local_cpu_percent', 'local_memory_mb', 
+            'aws_duration_ms', 'aws_memory_used_mb', 'duration_ratio', 
+            'memory_efficiency', 'calibration_ratio'
+        ]
+        
+        missing_features = [f for f in raw_features if f not in features]
+        if missing_features:
+            missing_encoded = [f for f in req_features if f not in features]
+            if missing_encoded:
+                return jsonify({
+                    "status": "error",
+                    "message": f"Missing required features: {', '.join(missing_features)}"
+                }), 400
+                
+        # Call the LIME explanation generator with the requested model
+        model_name = data.get('model', 'xgboost')
+        lime_explanation = lime_explainer.explain_with_lime(features, model_name=model_name)
+        
+        return jsonify({
+            "status": "success",
+            "lime_explanation": lime_explanation
+        }), 200
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            "status": "error",
+            "message": f"Internal LIME error: {str(e)}"
+        }), 500
+
+@app.route('/lime-global-importance', methods=['GET'])
+def get_lime_global_importance_endpoint():
+    """
+    Exposes global-level LIME importance rankings to the frontend.
+    Timing Note: LIME is computed on-demand here which takes ~50 seconds.
+    """
+    print("[LIME] Computing global importance — this may take ~50s")
+    try:
+        global_imp = lime_explainer.get_lime_global_importance()
+        return jsonify({
+            "status": "success",
+            "global_importance": global_imp
+        }), 200
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            "status": "error",
+            "message": f"Internal LIME error: {str(e)}"
         }), 500
 
 # --- HEARTBEAT MONITOR SYSTEM ---

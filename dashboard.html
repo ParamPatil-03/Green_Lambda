@@ -243,9 +243,57 @@
                             border-right: none !important;
                             padding: 1rem !important;
                         }
-                        #modelIntelligencePanel #modelShapLoaded > div > div:first-child {
-                            border-bottom: 1px solid var(--border) !important;
-                        }
+                    }
+                </style>
+
+                <!-- SHAP vs LIME — Global Comparison Section -->
+                <div class="section-header-wrap" style="margin-top: 2.5rem; margin-bottom: 1rem; border-left: 3px solid var(--accent); padding-left: 1rem; display: flex; flex-direction: column; gap: 0.25rem;">
+                    <h2 style="font-size: 1.4rem; font-weight: 800; letter-spacing: -0.02em; color: var(--text); margin: 0;">SHAP vs LIME — Global Comparison</h2>
+                    <p style="font-size: 0.85rem; color: var(--text-2); margin: 0;">Do both XAI techniques agree on feature importance?</p>
+                </div>
+
+                <div class="dash-card" style="margin-top: 1rem; padding: 1.5rem;" id="limeGlobalComparisonPanel">
+                    <!-- Button trigger (initial state) -->
+                    <div id="limeGlobalInitialState" style="padding: 2rem; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1rem; text-align: center;">
+                        <span style="font-size: 1.8rem;">📊</span>
+                        <p style="font-size: 0.9rem; color: var(--text-2); max-width: 500px; margin: 0;">
+                            LIME global feature importance requires fitting multiple local linear models (~50 samples) and takes about 50 seconds to calculate.
+                        </p>
+                        <button type="button" class="btn btn-primary" id="loadLimeGlobalBtn">
+                            <span class="fold"></span>
+                            <div class="points_wrapper"><i class="point"></i><i class="point"></i><i class="point"></i><i class="point"></i><i class="point"></i><i class="point"></i><i class="point"></i><i class="point"></i><i class="point"></i><i class="point"></i></div>
+                            <span class="inner">Run Global Comparison</span>
+                        </button>
+                    </div>
+
+                    <!-- Loading Spinner State -->
+                    <div id="limeGlobalLoading" style="padding: 3rem; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 1rem; text-align: center; width: 100%;">
+                        <div class="spinner" style="width: 40px; height: 40px; border: 3px solid rgba(255,255,255,0.05); border-top: 3px solid var(--accent); border-radius: 50%; animation: spin 1s linear infinite;"></div>
+                        <span style="font-family: var(--mono); font-size: 0.85rem; color: var(--text-2); letter-spacing: 0.05em; text-transform: uppercase; margin-top: 0.5rem; display: inline-block;">Computing LIME explanations... (~50 seconds)</span>
+                    </div>
+
+                    <!-- Error State -->
+                    <div id="limeGlobalError" style="padding: 2rem; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 0.5rem; text-align: center; width: 100%;">
+                        <span style="font-size: 1.5rem;">⚠️</span>
+                        <strong style="color: var(--red); font-size: 0.95rem;">LIME global analysis failed.</strong>
+                        <p style="font-size: 0.8rem; color: var(--text-3); margin: 0;">Ensure backend server is running and LIME explainer is initialized.</p>
+                    </div>
+
+                    <!-- Loaded Comparison Chart -->
+                    <div id="limeGlobalLoaded" style="display: none; width: 100%;">
+                        <div class="dash-card-header" style="padding: 0 0 0.75rem 0;">
+                            <h3 style="font-size: 0.95rem; font-weight: 700; color: var(--text-2);">SHAP vs LIME Global Importance (Top 10 Features)</h3>
+                        </div>
+                        <div class="chart-wrap" style="height: 380px; position: relative; width: 100%;">
+                            <canvas id="shapVsLimeCompareChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <style>
+                    @keyframes spin {
+                        0% { transform: rotate(0deg); }
+                        100% { transform: rotate(360deg); }
                     }
                 </style>
 

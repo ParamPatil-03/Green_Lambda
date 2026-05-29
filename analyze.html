@@ -170,6 +170,7 @@
                         <div style="display: flex; gap: 1.5rem; border-bottom: 1px solid var(--border); margin-bottom: 1.5rem; padding-bottom: 0.5rem;">
                             <button type="button" class="intel-tab-btn active" id="tabFeatureImpactBtn">Feature Impact</button>
                             <button type="button" class="intel-tab-btn" id="tabModelConfidenceBtn">Model Confidence</button>
+                            <button type="button" class="intel-tab-btn" id="tabXaiComparisonBtn">XAI Comparison</button>
                         </div>
 
                         <!-- Skeleton State -->
@@ -189,6 +190,14 @@
 
                         <!-- Tab 1: Feature Impact Content -->
                         <div id="tabFeatureImpactContent" style="display: none; width: 100%;">
+                            <!-- Header with SHAP/LIME toggle -->
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; border-bottom: 1px solid var(--border); padding-bottom: 0.75rem; width: 100%;">
+                                <span style="font-size: 0.85rem; font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-2);">Local Feature Attribution</span>
+                                <div class="xai-toggle-group" data-target="feature-impact" style="display: flex; gap: 0.25rem; background: rgba(255,255,255,0.02); border: 1px solid var(--border); padding: 2px; border-radius: 6px;">
+                                    <button type="button" class="xai-toggle-btn active" data-method="shap">SHAP</button>
+                                    <button type="button" class="xai-toggle-btn" data-method="lime">LIME</button>
+                                </div>
+                            </div>
                             <div style="display: flex; flex-wrap: wrap; width: 100%;">
                                 <!-- Left Side: Waterfall horizontal chart (55%) -->
                                 <div style="flex: 0 0 55%; max-width: 55%; padding-right: 1.5rem; border-right: 1px solid var(--border); display: flex; flex-direction: column; gap: 0.75rem;">
@@ -213,6 +222,14 @@
 
                         <!-- Tab 2: Model Confidence Content -->
                         <div id="tabModelConfidenceContent" style="display: none; width: 100%; flex-direction: column; align-items: center; justify-content: center; padding: 1.5rem 0; text-align: center;">
+                            <!-- Header with SHAP/LIME toggle -->
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; border-bottom: 1px solid var(--border); padding-bottom: 0.75rem; width: 100%; max-width: 600px;">
+                                <span style="font-size: 0.85rem; font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-2);">Attribution Waterfall Flow</span>
+                                <div class="xai-toggle-group" data-target="model-confidence" style="display: flex; gap: 0.25rem; background: rgba(255,255,255,0.02); border: 1px solid var(--border); padding: 2px; border-radius: 6px;">
+                                    <button type="button" class="xai-toggle-btn active" data-method="shap">SHAP</button>
+                                    <button type="button" class="xai-toggle-btn" data-method="lime">LIME</button>
+                                </div>
+                            </div>
                             <div style="display: flex; align-items: center; justify-content: center; gap: 2rem; margin-bottom: 2rem; width: 100%; max-width: 600px; flex-wrap: wrap;">
                                 <div style="flex: 1; min-width: 150px;">
                                     <div style="font-size: 2.2rem; font-weight: 800; font-family: var(--mono); color: var(--accent-2);" id="confBaseValue">-- mWh</div>
@@ -243,6 +260,55 @@
                             <p id="confExplanationSummary" style="font-size: 0.9rem; line-height: 1.6; color: var(--text-2); max-width: 600px; margin: 0; padding: 0.75rem 1rem; background: rgba(255,255,255,0.01); border: 1px solid var(--border); border-radius: 8px;">
                                 Calculating collective drivers...
                             </p>
+                        </div>
+
+                        <!-- Tab 3: LIME vs SHAP Comparison Content -->
+                        <div id="tabXaiComparisonContent" style="display: none; width: 100%;">
+                            <!-- Loading Skeleton for LIME -->
+                            <div id="limeLoadingSkeleton" style="padding: 2.5rem; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1rem; width: 100%;">
+                                <div class="loading-bar-skeleton" style="width: 80%; height: 20px; background: rgba(255, 255, 255, 0.05); border-radius: 4px; animation: skeleton-pulse 1.5s infinite ease-in-out;"></div>
+                                <div class="loading-bar-skeleton" style="width: 60%; height: 16px; background: rgba(255, 255, 255, 0.05); border-radius: 4px; animation: skeleton-pulse 1.5s infinite ease-in-out; animation-delay: 0.2s;"></div>
+                                <span style="font-family: var(--mono); font-size: 0.8rem; color: var(--text-2); letter-spacing: 0.05em; margin-top: 0.5rem; text-transform: uppercase;">Computing LIME local perturbations...</span>
+                            </div>
+
+                            <!-- Error State for LIME -->
+                            <div id="limeErrorState" style="padding: 2rem; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 0.5rem; width: 100%; text-align: center;">
+                                <span style="font-size: 1.5rem;">⚠️</span>
+                                <span style="color: var(--red); font-size: 0.95rem; font-weight: 600;">LIME explanation unavailable.</span>
+                                <p style="font-size: 0.8rem; color: var(--text-3); margin: 0;">Ensure backend server is running and LIME explainer is initialized.</p>
+                            </div>
+
+                            <!-- Comparison View -->
+                            <div id="limeCompareContent" style="display: none; width: 100%;">
+                                <!-- TOP SECTION: Side-by-side comparison table -->
+                                <div style="width: 100%; margin-bottom: 1.5rem; overflow-x: auto;">
+                                    <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem; color: var(--text-2);">
+                                        <thead>
+                                            <tr style="background: var(--surface); border-bottom: 1px solid var(--border);">
+                                                <th style="padding: 0.75rem 1rem; font-weight: 700; color: var(--text);">Feature Name</th>
+                                                <th style="padding: 0.75rem 1rem; font-weight: 700; color: var(--text); text-align: right;">SHAP Value (mWh)</th>
+                                                <th style="padding: 0.75rem 1rem; font-weight: 700; color: var(--text); text-align: right;">LIME Weight (mWh)</th>
+                                                <th style="padding: 0.75rem 1rem; font-weight: 700; color: var(--text); text-align: center;">Agreement</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="xaiComparisonTableBody">
+                                            <!-- Injected dynamically -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <!-- BOTTOM SECTION: Agreement Score & Summary -->
+                                <div style="display: flex; flex-direction: column; gap: 0.75rem; align-items: center; justify-content: center; padding: 1.25rem; background: rgba(255,255,255,0.01); border: 1px solid var(--border); border-radius: 8px; text-align: center; width: 100%;">
+                                    <div style="font-size: 1.3rem; font-weight: 800;" id="limeAgreementScoreLabel">
+                                        Agreement Score: <span id="limeAgreementScore">0/10</span>
+                                    </div>
+                                    <div style="font-size: 0.75rem; padding: 3px 10px; border-radius: 4px; font-weight: 600; text-transform: uppercase;" id="limeAgreementBadge">
+                                        Calculating...
+                                    </div>
+                                    <p id="limeComparisonSummaryText" style="font-size: 0.85rem; line-height: 1.5; color: var(--text-2); max-width: 600px; margin: 0; margin-top: 0.25rem;">
+                                        Comparing model explanations...
+                                    </p>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -280,6 +346,24 @@
                             -webkit-background-clip: text !important;
                             -webkit-text-fill-color: transparent !important;
                             background-clip: text !important;
+                        }
+                        /* Toggle selector styles */
+                        .xai-toggle-btn {
+                            background: none !important;
+                            border: none !important;
+                            font-family: inherit !important;
+                            font-size: 0.72rem !important;
+                            font-weight: 700 !important;
+                            padding: 4px 12px !important;
+                            border-radius: 4px !important;
+                            color: var(--text-3) !important;
+                            cursor: pointer !important;
+                            transition: all 0.2s ease !important;
+                        }
+                        .xai-toggle-btn.active {
+                            background: var(--accent) !important;
+                            color: #0a0a0a !important;
+                            box-shadow: 0 0 10px rgba(200, 255, 0, 0.3);
                         }
                         /* Small responsive adjust */
                         @media (max-width: 991px) {
