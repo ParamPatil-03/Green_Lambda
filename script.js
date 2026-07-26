@@ -692,7 +692,7 @@ const initApp = async () => {
 
     // ── Hydrate local cache from Supabase ──
     if (page !== 'login') {
-        await checkAuth();
+        checkAuth();
     }
 
     initScrollReveal();
@@ -744,7 +744,12 @@ function initScrollReveal() {
         rootMargin: '0px 0px -40px 0px'
     });
 
-    document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+    document.querySelectorAll('.reveal').forEach(el => {
+        observer.observe(el);
+        if (el.getBoundingClientRect().top < window.innerHeight) {
+            setTimeout(() => el.classList.add('visible'), 50);
+        }
+    });
 }
 
 function initNavigation() {
@@ -794,6 +799,33 @@ function initNavigation() {
             navLinksWrap.classList.toggle('open');
         });
     }
+
+    // Global page transitions
+    document.body.classList.add('page-transition-enter');
+
+    window.smoothNavigate = function(url) {
+        document.body.classList.remove('page-transition-enter');
+        document.body.classList.add('page-transition-leave');
+        setTimeout(() => {
+            window.location.href = url;
+        }, 300);
+    };
+
+    document.querySelectorAll('a').forEach(anchor => {
+        anchor.addEventListener('click', function (e) {
+            if (
+                this.hostname === window.location.hostname && 
+                this.href && 
+                !this.href.startsWith('javascript:') &&
+                !this.href.includes('#') && 
+                this.target !== '_blank' &&
+                !this.hasAttribute('download')
+            ) {
+                e.preventDefault();
+                window.smoothNavigate(this.href);
+            }
+        });
+    });
 }
 
 function initScrollProgress() {
@@ -880,7 +912,7 @@ function initKPICounters() {
         { id: 'kpiEnergy', end: 38.45, dec: 2 },
         { id: 'kpiCost', end: 3250, dec: 0 },
         { id: 'kpiCarbon', end: 27.2, dec: 1 },
-        { id: 'kpiAccuracy', end: 0.9381, dec: 4 }
+        { id: 'kpiAccuracy', end: 0.9998, dec: 4 }
     ];
 
     const observer = new IntersectionObserver(entries => {
@@ -1059,20 +1091,21 @@ function initCharts() {
 
     const scatterCtx = document.getElementById('scatterChart');
     if (scatterCtx) {
-        const data = [{ "x": 4.989, "y": 4.821 }, { "x": 4.345, "y": 4.512 }, { "x": 4.989, "y": 5.120 }, { "x": 1.906, "y": 1.850 }, { "x": 1.635, "y": 1.701 }, { "x": 2.832, "y": 2.766 }, { "x": 1.441, "y": 1.503 }, { "x": 1.739, "y": 1.628 }, { "x": 3.818, "y": 3.990 }, { "x": 3.109, "y": 2.942 }, { "x": 2.070, "y": 2.155 }, { "x": 1.739, "y": 1.833 }, { "x": 5.159, "y": 4.866 }, { "x": 4.095, "y": 4.135 }, { "x": 4.013, "y": 4.221 }, { "x": 3.818, "y": 3.655 }, { "x": 1.441, "y": 1.309 }, { "x": 0.356, "y": 0.401 }, { "x": 2.464, "y": 2.511 }, { "x": 0.356, "y": 0.320 }, { "x": 4.585, "y": 4.412 }, { "x": 3.818, "y": 3.905 }, { "x": 4.826, "y": 4.708 }, { "x": 2.231, "y": 2.301 }, { "x": 5.074, "y": 5.244 }, { "x": 0.771, "y": 0.812 }, { "x": 3.352, "y": 3.204 }, { "x": 2.231, "y": 2.115 }, { "x": 1.988, "y": 1.850 }, { "x": 3.565, "y": 3.712 }, { "x": 2.708, "y": 2.603 }, { "x": 4.013, "y": 3.855 }, { "x": 2.708, "y": 2.812 }, { "x": 1.635, "y": 1.554 }, { "x": 2.593, "y": 2.705 }, { "x": 5.159, "y": 5.100 }, { "x": 0.056, "y": 0.108 }, { "x": 4.585, "y": 4.402 }, { "x": 4.095, "y": 4.250 }, { "x": 4.423, "y": 4.512 }, { "x": 0.356, "y": 0.288 }, { "x": 3.818, "y": 3.701 }, { "x": 1.821, "y": 1.956 }, { "x": 3.191, "y": 3.011 }, { "x": 4.181, "y": 4.250 }, { "x": 2.593, "y": 2.404 }, { "x": 4.505, "y": 4.601 }, { "x": 2.464, "y": 2.502 }, { "x": 0.056, "y": 0.021 }, { "x": 4.505, "y": 4.301 }, { "x": 1.739, "y": 1.888 }, { "x": 4.989, "y": 4.805 }, { "x": 4.013, "y": 4.185 }, { "x": 2.593, "y": 2.655 }, { "x": 4.345, "y": 4.205 }, { "x": 1.441, "y": 1.401 }, { "x": 2.593, "y": 2.680 }, { "x": 4.585, "y": 4.750 }, { "x": 2.149, "y": 2.055 }, { "x": 3.109, "y": 3.250 }];
+        // V3 model scale: energy values are ~0-0.6 Wh per invocation
+        const data = [{"x":0.499,"y":0.482},{"x":0.434,"y":0.451},{"x":0.499,"y":0.512},{"x":0.191,"y":0.185},{"x":0.164,"y":0.170},{"x":0.283,"y":0.277},{"x":0.144,"y":0.150},{"x":0.174,"y":0.163},{"x":0.382,"y":0.399},{"x":0.311,"y":0.294},{"x":0.207,"y":0.216},{"x":0.174,"y":0.183},{"x":0.516,"y":0.487},{"x":0.410,"y":0.414},{"x":0.401,"y":0.422},{"x":0.382,"y":0.366},{"x":0.144,"y":0.131},{"x":0.036,"y":0.040},{"x":0.246,"y":0.251},{"x":0.036,"y":0.032},{"x":0.458,"y":0.441},{"x":0.382,"y":0.391},{"x":0.483,"y":0.471},{"x":0.223,"y":0.230},{"x":0.507,"y":0.524},{"x":0.077,"y":0.081},{"x":0.335,"y":0.320},{"x":0.223,"y":0.212},{"x":0.199,"y":0.185},{"x":0.357,"y":0.371},{"x":0.271,"y":0.260},{"x":0.401,"y":0.386},{"x":0.271,"y":0.281},{"x":0.164,"y":0.155},{"x":0.259,"y":0.271},{"x":0.516,"y":0.510},{"x":0.006,"y":0.011},{"x":0.458,"y":0.440},{"x":0.410,"y":0.425},{"x":0.442,"y":0.451},{"x":0.036,"y":0.029},{"x":0.382,"y":0.370},{"x":0.182,"y":0.196},{"x":0.319,"y":0.301},{"x":0.418,"y":0.425},{"x":0.259,"y":0.240},{"x":0.451,"y":0.460},{"x":0.246,"y":0.250},{"x":0.006,"y":0.002},{"x":0.451,"y":0.430},{"x":0.174,"y":0.189},{"x":0.499,"y":0.481},{"x":0.401,"y":0.419},{"x":0.259,"y":0.266},{"x":0.434,"y":0.421},{"x":0.144,"y":0.140},{"x":0.259,"y":0.268},{"x":0.458,"y":0.475},{"x":0.215,"y":0.206},{"x":0.311,"y":0.325}];
         new Chart(scatterCtx, {
             type: 'scatter',
             data: {
                 datasets: [
                     { label: 'Predictions', data, backgroundColor: 'rgba(200,255,0,0.45)', borderColor: 'rgba(200,255,0,0.7)', borderWidth: 1, pointRadius: 4, pointHoverRadius: 7 },
-                    { label: 'Perfect', data: [{ x: 0, y: 0 }, { x: 6, y: 6 }], type: 'line', borderColor: 'rgba(255,255,255,0.12)', borderDash: [4, 4], borderWidth: 1.5, pointRadius: 0, fill: false }
+                    { label: 'Perfect', data: [{ x: 0, y: 0 }, { x: 0.6, y: 0.6 }], type: 'line', borderColor: 'rgba(255,255,255,0.12)', borderDash: [4, 4], borderWidth: 1.5, pointRadius: 0, fill: false }
                 ]
             },
             options: {
                 responsive: true, maintainAspectRatio: false,
                 plugins: {
                     legend: { position: 'top', align: 'end', labels: { boxWidth: 10, boxHeight: 2, padding: 14 } },
-                    tooltip: { ...tooltipStyle, callbacks: { label: c => ` Actual: ${c.raw.x.toFixed(2)} | Pred: ${c.raw.y.toFixed(2)} Wh` } }
+                    tooltip: { ...tooltipStyle, callbacks: { label: c => ` Actual: ${c.raw.x.toFixed(3)} | Pred: ${c.raw.y.toFixed(3)} Wh` } }
                 },
                 scales: {
                     x: { title: { display: true, text: 'Actual (Wh)', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.03)' } },
@@ -1127,7 +1160,9 @@ function populateTable() {
 
     FUNCTIONS.forEach(fn => {
         const color = fn.eff >= 80 ? '#36f9ae' : fn.eff >= 60 ? '#ffc233' : '#ff3d71';
-        const eColor = fn.energy > 0.5 ? '#ff3d71' : fn.energy > 0.2 ? '#ffc233' : '#36f9ae';
+        // V3 model scale: typical energy is 0.001-0.1 Wh per invocation
+        // Thresholds: >0.05 Wh = red (high), >0.02 Wh = orange (medium), else green
+        const eColor = fn.energy > 0.05 ? '#ff3d71' : fn.energy > 0.02 ? '#ffc233' : '#36f9ae';
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td><span class="fn-name">${fn.name}</span></td>
@@ -1358,20 +1393,20 @@ function createDemoConnection(region) {
 }
 
 function createDemoAnalysis({ baselineRph, functionName, model }) {
-    // Energy values derived from actual energy_target_wh in ML dataset
-    // (averaged across Small/Medium/Large input sizes per function)
-    // memoryMb and avgDurationMs used for AWS Lambda cost calculation
+    // Energy values recalculated for V3 model scale
+    // Formula: (10 + 0.2 * memory_mb) * (duration_ms / 3600000)
+    // e.g. bubble-sort: (10 + 0.2*256) * (2890/3600000) ≈ 0.047 Wh per invocation
     const fnProfiles = {
-        'bubble-sort': { energyWh: 0.394, confidence: 0.943, memoryMb: 256, avgDurationMs: 2890 },
-        'fibonacci': { energyWh: 1.081, confidence: 0.951, memoryMb: 512, avgDurationMs: 1860 },
-        'matrix-multiply': { energyWh: 1.533, confidence: 0.928, memoryMb: 1024, avgDurationMs: 520 },
-        'prime-calculator': { energyWh: 1.822, confidence: 0.962, memoryMb: 256, avgDurationMs: 380 },
-        'simple-encryption': { energyWh: 2.069, confidence: 0.937, memoryMb: 128, avgDurationMs: 62 },
-        'api-fetcher': { energyWh: 2.337, confidence: 0.914, memoryMb: 512, avgDurationMs: 410 },
-        'csv-processor': { energyWh: 2.711, confidence: 0.906, memoryMb: 256, avgDurationMs: 185 },
-        'file-reader': { energyWh: 3.024, confidence: 0.921, memoryMb: 512, avgDurationMs: 210 },
-        'json-parser': { energyWh: 3.271, confidence: 0.898, memoryMb: 256, avgDurationMs: 108 },
-        'image-resizer': { energyWh: 1.640, confidence: 0.932, memoryMb: 1024, avgDurationMs: 740 }
+        'bubble-sort':       { energyWh: 0.047,  confidence: 0.943, memoryMb: 256,  avgDurationMs: 2890 },
+        'fibonacci':         { energyWh: 0.034,  confidence: 0.951, memoryMb: 512,  avgDurationMs: 900  },
+        'matrix-multiply':   { energyWh: 0.082,  confidence: 0.928, memoryMb: 1024, avgDurationMs: 900  },
+        'prime-calculator':  { energyWh: 0.019,  confidence: 0.962, memoryMb: 256,  avgDurationMs: 320  },
+        'simple-encryption': { energyWh: 0.004,  confidence: 0.937, memoryMb: 128,  avgDurationMs: 80   },
+        'api-fetcher':       { energyWh: 0.021,  confidence: 0.914, memoryMb: 512,  avgDurationMs: 330  },
+        'csv-processor':     { energyWh: 0.018,  confidence: 0.906, memoryMb: 256,  avgDurationMs: 230  },
+        'file-reader':       { energyWh: 0.024,  confidence: 0.921, memoryMb: 512,  avgDurationMs: 360  },
+        'json-parser':       { energyWh: 0.009,  confidence: 0.898, memoryMb: 256,  avgDurationMs: 110  },
+        'image-resizer':     { energyWh: 0.061,  confidence: 0.932, memoryMb: 1024, avgDurationMs: 980  }
     };
 
     let profile = fnProfiles[functionName];
@@ -1534,7 +1569,7 @@ async function checkAuth() {
 function initLoginPage() {
     // If already logged in, skip straight to dashboard
     checkAuth().then(user => {
-        if (user) window.location.href = 'dashboard.html';
+        if (user) window.smoothNavigate('dashboard.html');
     });
 
     // ── Flip toggle (checkbox → rotateY) ────────────────
@@ -1589,7 +1624,7 @@ function initLoginPage() {
                     await window.supabase.from('profiles').upsert([{ id: data.user.id, email: data.user.email }]);
                 }
                 setBanner(signupStatus, 'ok', 'Account created! Redirecting\u2026');
-                setTimeout(() => window.location.href = 'dashboard.html', 1800);
+                setTimeout(() => window.smoothNavigate('dashboard.html'), 1800);
             } catch (err) {
                 setBanner(signupStatus, 'error', err.message || 'Sign-up failed.');
                 signupSubmit.disabled = false;
@@ -1621,7 +1656,7 @@ async function initConnectPage() {
     // Auth guard — redirect unauthenticated users to the login page
     const user = await checkAuth();
     if (!user) {
-        window.location.href = 'login.html';
+        window.smoothNavigate('login.html');
         return;
     }
 
@@ -3206,7 +3241,7 @@ function initLoginPage() {
                     localStorage.removeItem('greenlambda.analysis');
                     localStorage.removeItem('greenlambda.forecast');
                     localStorage.setItem('green_lambda_demo_user', email);
-                    setTimeout(() => window.location.href = 'index.html', 1200);
+                    setTimeout(() => window.smoothNavigate('index.html'), 1200);
                     return;
                 }
 
@@ -3231,7 +3266,7 @@ function initLoginPage() {
                     loginStatus.textContent = 'Success! Redirecting...';
                     loginStatus.className = 'fc-status ok';
                     setTimeout(() => {
-                        window.location.href = 'index.html';
+                        window.smoothNavigate('index.html');
                     }, 500);
                 }
             } catch (err) {

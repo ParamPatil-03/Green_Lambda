@@ -4,8 +4,8 @@ Green Lambda Model Loader Module
 This module implements a singleton pattern to load all trained ML models
 and preprocessors once at startup.
 
-Trained ML Features List (34 Features in Order):
-------------------------------------------------
+Trained ML Features List — V3 (33 Features, calibration_ratio removed):
+------------------------------------------------------------------------
 1.  'memory_config_mb' (AWS Lambda Memory Allocation)
 2.  'cold_start' (Cold Start Flag: 0 or 1)
 3.  'lines_of_code' (Static Code Metric - LOC)
@@ -21,25 +21,27 @@ Trained ML Features List (34 Features in Order):
 13. 'aws_memory_used_mb' (AWS CloudWatch MaxMemoryUsed metric)
 14. 'duration_ratio' (Ratio of aws_duration to local_duration)
 15. 'memory_efficiency' (Ratio of aws_memory_used to memory_config)
-16. 'calibration_ratio' (Calibration constant)
-17. 'function_name_array-operations' (One-hot encoded)
-18. 'function_name_bubble-sort' (One-hot encoded)
-19. 'function_name_csv-processor' (One-hot encoded)
-20. 'function_name_data-transform' (One-hot encoded)
-21. 'function_name_dict-builder' (One-hot encoded)
-22. 'function_name_fibonacci' (One-hot encoded)
-23. 'function_name_file-reader' (One-hot encoded)
-24. 'function_name_json-parser' (One-hot encoded)
-25. 'function_name_list-comprehension' (One-hot encoded)
-26. 'function_name_matrix-multiply' (One-hot encoded)
-27. 'function_name_prime-calculator' (One-hot encoded)
-28. 'function_name_simple-encryption' (One-hot encoded)
-29. 'function_name_string-concat' (One-hot encoded)
-30. 'function_name_url-validator' (One-hot encoded)
-31. 'function_type_io' (One-hot encoded)
-32. 'function_type_memory' (One-hot encoded)
-33. 'input_size_Medium' (One-hot encoded)
-34. 'input_size_Small' (One-hot encoded)
+16. 'function_name_array-operations' (One-hot encoded)
+17. 'function_name_bubble-sort' (One-hot encoded)
+18. 'function_name_csv-processor' (One-hot encoded)
+19. 'function_name_data-transform' (One-hot encoded)
+20. 'function_name_dict-builder' (One-hot encoded)
+21. 'function_name_fibonacci' (One-hot encoded)
+22. 'function_name_file-reader' (One-hot encoded)
+23. 'function_name_json-parser' (One-hot encoded)
+24. 'function_name_list-comprehension' (One-hot encoded)
+25. 'function_name_matrix-multiply' (One-hot encoded)
+26. 'function_name_prime-calculator' (One-hot encoded)
+27. 'function_name_simple-encryption' (One-hot encoded)
+28. 'function_name_string-concat' (One-hot encoded)
+29. 'function_name_url-validator' (One-hot encoded)
+30. 'function_type_io' (One-hot encoded)
+31. 'function_type_memory' (One-hot encoded)
+32. 'input_size_Medium' (One-hot encoded)
+33. 'input_size_Small' (One-hot encoded)
+
+Model Version: V3 (175 functions, 6132 records, combined dataset)
+Target Formula: energy_wh = (10 + 0.2 * memory_config_mb) * (aws_duration_ms / 3600000)
 """
 
 import os
@@ -81,20 +83,20 @@ class ModelLoader:
         else:
             raise FileNotFoundError(f"Feature names file not found: {feat_path}")
 
-        # 2. Load Scaler
-        scaler_path = os.path.join(models_dir, 'scaler.pkl')
+        # 2. Load Scaler (V3: scaler_v3.pkl fitted on 33-feature combined dataset)
+        scaler_path = os.path.join(models_dir, 'scaler_v3.pkl')
         if os.path.exists(scaler_path):
             with open(scaler_path, 'rb') as f:
                 self.scaler = pickle.load(f)
-            print("  - Loaded standard scaler")
+            print("  - Loaded standard scaler (v3)")
         else:
-            print("  - Warning: scaler.pkl not found")
+            print("  - Warning: scaler_v3.pkl not found")
 
-        # 3. Load Models
+        # 3. Load Models (V3: trained on combined 175-function, 6132-record dataset)
         model_files = {
-            'xgboost': 'xgboost_model.pkl',
-            'random_forest': 'random_forest_model.pkl',
-            'neural_network': 'neural_network_model.pkl'
+            'xgboost': 'xgboost_model_v3.pkl',
+            'random_forest': 'random_forest_model_v3.pkl',
+            'neural_network': 'neural_network_model_v3.pkl'
         }
 
         for model_key, filename in model_files.items():

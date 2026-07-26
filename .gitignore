@@ -25,4 +25,7 @@ Thumbs.db
 # AWS Credentials / Secrets
 aws_session.json
 backend/aws_session.json
+models_backup_*.zip
+ml_model/alibaba_validation/raw/
+ml_model/azure_validation/raw/
 

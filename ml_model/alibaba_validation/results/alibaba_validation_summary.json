@@ -1,0 +1,62 @@
+{
+  "dataset": "Alibaba Cloud Functions 2021",
+  "paper": "Low-Carbon Serverless Dataset, 2021",
+  "sample_size": 5000,
+  "validation_date": "2026-07-25",
+  "overall_metrics": {
+    "r2_score": 0.6997233198289917,
+    "mae_wh": 0.0436051149656815,
+    "rmse_wh": 0.15095520578903662,
+    "mape_pct": 48.707097965911515,
+    "mean_accuracy_pct": 53.01129157427007
+  },
+  "aws_baseline_metrics": {
+    "r2_score": 0.9999,
+    "mae_wh": 0.0011,
+    "rmse_wh": 0.0115
+  },
+  "breakdown_by_runtime": {
+    "python": {
+      "r2": 0.8137777247026278,
+      "mae": 0.035362676500570345,
+      "rmse": 0.13909353599140306,
+      "mape": 47.64024344644143,
+      "accuracy": 53.741595650191236,
+      "n": 1985
+    },
+    "nodejs": {
+      "r2": 0.4757269167453031,
+      "mae": 0.029671180354351026,
+      "rmse": 0.06861438924417128,
+      "mape": 50.333969266751225,
+      "accuracy": 51.43600733244982,
+      "n": 2092
+    },
+    "java": {
+      "r2": 0.13128226551569855,
+      "mae": 0.18550825723820197,
+      "rmse": 0.37365539186372887,
+      "mape": 49.60480613818054,
+      "accuracy": 53.90978187308068,
+      "n": 296
+    },
+    "php": {
+      "r2": 0.021239643165490207,
+      "mae": 0.008133199396640969,
+      "rmse": 0.014920029732902212,
+      "mape": 45.057612377134824,
+      "accuracy": 56.988909325101645,
+      "n": 470
+    },
+    "others": {
+      "r2": 0.648391087146895,
+      "mae": 0.17213697334104422,
+      "rmse": 0.393035679118708,
+      "mape": 49.75058884186592,
+      "accuracy": 51.166753815325336,
+      "n": 157
+    }
+  },
+  "feature_imputation_note": "AST features (cyclomatic complexity, LOC, nesting depth etc.) and trigger type features were imputed with training data means/proportions as Alibaba dataset does not contain source code or trigger details. Only execution metrics and memory allocation were used directly.",
+  "generalizability_verdict": "WEAK"
+}

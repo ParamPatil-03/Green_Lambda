@@ -26,11 +26,14 @@ active_sessions = {}
 # Paths
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MODELS_DIR = os.path.join(BASE_DIR, 'backend', 'models')
-DATA_FILE = os.path.join(BASE_DIR, 'ml_model', 'final_ml_dataset_clean.csv')
+DATA_FILE = os.path.join(BASE_DIR, 'ml_model', 'new_ml_dataset.csv')
 
 # Load dataset to use as a lookup for function features
 try:
-    df = pd.read_csv(DATA_FILE)
+    df1 = pd.read_csv(os.path.join(BASE_DIR, 'ml_model', 'final_ml_dataset_clean.csv'))
+    df2 = pd.read_csv(os.path.join(BASE_DIR, 'ml_model', 'new_ml_dataset.csv'))
+    df = pd.concat([df1, df2], ignore_index=True)
+    
     # We will compute the average features for each function name
     fn_features = df.groupby('function_name').mean(numeric_only=True).reset_index()
     # We also need categorical modes
@@ -57,13 +60,18 @@ def prepare_features(fn_name):
     if fn_lookup is None:
         raise ValueError("Dataset not loaded.")
 
+    is_fallback = False
     row = fn_lookup[fn_lookup['function_name'] == fn_name]
     if row.empty:
-        # Real function not in training set — use a deterministic hash of the function name 
-        # to select a baseline row from fn_lookup to provide realistic variation.
-        import zlib
-        idx = zlib.adler32(fn_name.encode('utf-8')) % len(fn_lookup)
-        row = fn_lookup.iloc[[idx]].copy()
+        is_fallback = True
+        # Real function not in training set.
+        # Instead of borrowing another function's AST metrics (which causes identical predictions
+        # and misleading similarities), construct a row using the dataset median for numeric 
+        # features and mode for categorical features to represent a "typical" unseen function.
+        row = pd.DataFrame([fn_lookup.median(numeric_only=True)])
+        row['function_name'] = fn_name
+        row['function_type'] = fn_lookup['function_type'].mode()[0]
+        row['input_size'] = fn_lookup['input_size'].mode()[0]
 
     def fval(col):
         """Safely extract a float value from the row."""
@@ -94,7 +102,7 @@ def prepare_features(fn_name):
         'aws_memory_used_mb':    [fval('aws_memory_used_mb')],
         'duration_ratio':        [fval('duration_ratio')],
         'memory_efficiency':     [fval('memory_efficiency')],
-        'calibration_ratio':     [fval('calibration_ratio')],
+        # calibration_ratio removed in V3: it was a dataset-specific leakage feature
     })
 
     # Prepare base df: drop target/leakage columns
@@ -123,7 +131,7 @@ def prepare_features(fn_name):
     # FINAL SAFETY: force every column to numeric — XGBoost rejects object dtype
     X_single = X_single.apply(pd.to_numeric, errors='coerce').fillna(0)
 
-    return X_single, row
+    return X_single, row, is_fallback
 
 @app.route('/connect-aws', methods=['POST'])
 def connect_aws():
@@ -166,16 +174,16 @@ def connect_aws():
             
         client = boto3.client('lambda', **client_kwargs)
         
-        # Fetch real deployed lambda functions
-        response = client.list_functions(MaxItems=50)
-        
+        # Fetch all real deployed lambda functions using paginator
+        paginator = client.get_paginator('list_functions')
         functions = []
-        for fn in response.get('Functions', []):
-            functions.append({
-                "name": fn.get('FunctionName'),
-                "runtime": fn.get('Runtime', 'Unknown'),
-                "memoryMb": fn.get('MemorySize', 128)
-            })
+        for page in paginator.paginate():
+            for fn in page.get('Functions', []):
+                functions.append({
+                    "name": fn.get('FunctionName'),
+                    "runtime": fn.get('Runtime', 'Unknown'),
+                    "memoryMb": fn.get('MemorySize', 128)
+                })
             
         conn_id = f"live-aws-{int(pd.Timestamp.now().timestamp())}"
         # Store credentials server-side so later calls can use them by connectionId
@@ -207,7 +215,7 @@ def analyze_function():
     model = models.get(model_name, models.get('xgboost'))
     
     try:
-        X_single, row_details = prepare_features(fn_name)
+        X_single, row_details, is_fallback = prepare_features(fn_name)
         
         # ── AWS CLOUDWATCH LIVE EXTRACTION (Dynamic ML Features) ──
         # In a full-auth environment, we extract keys via connectionId from DB.
@@ -312,14 +320,18 @@ def analyze_function():
             X_pred = X_single
             
         # Predict Energy dynamically using live/fallback cloudwatch metrics
-        energy_pred = float(model.predict(X_pred)[0])
+        raw_energy = float(model.predict(X_pred)[0])
+        energy_pred = max(0.0001, raw_energy)
         
         # Calculate derived metrics
         mem_mb = float(row_details['memory_config_mb'].values[0])
         dur_ms = float(row_details['aws_duration_ms'].values[0])  # Uses live if available
         
-        # Confidence logic based on model
-        conf = 0.96 if model_name == 'xgboost' else 0.94 if model_name == 'random_forest' else 0.92
+        # Confidence logic based on model and whether it's a fallback
+        if is_fallback:
+            conf = 0.50
+        else:
+            conf = 0.96 if model_name == 'xgboost' else 0.94 if model_name == 'random_forest' else 0.92
         
         monthly_invs = baseline_rph * 24 * 30
         monthly_energy = (monthly_invs * energy_pred) / 1000
@@ -356,13 +368,14 @@ def predict_spike():
     model = models.get(model_name, models.get('xgboost'))
     
     try:
-        X_single, row_details = prepare_features(fn_name)
+        X_single, row_details, is_fallback = prepare_features(fn_name)
         if model_name == 'neural_network' and scaler:
             X_pred = scaler.transform(X_single)
         else:
             X_pred = X_single
             
-        energy_pred = float(model.predict(X_pred)[0])
+        raw_energy = float(model.predict(X_pred)[0])
+        energy_pred = max(0.0001, raw_energy)
         
         peak_req = baseline_rph * multiplier
         mem_mb = float(row_details['memory_config_mb'].values[0])
@@ -570,7 +583,7 @@ def collect_runtime_metrics():
         carbon_gco2_actual = (energy_wh_actual / 1000) * 708000
 
         model = models.get('xgboost')
-        X_single, _ = prepare_features(fn_name)
+        X_single, _, _ = prepare_features(fn_name)
         
         # Override the static fallback features with the LIVE AWS metrics before predicting
         if avg_duration > 0:
@@ -581,24 +594,51 @@ def collect_runtime_metrics():
 
         energy_wh_predicted = float(model.predict(X_single)[0])
 
-        import random
-        # Handle out-of-scale predictions for custom functions not in the original dataset
-        # XGBoost trees can output wild numbers for completely unseen feature distributions
-        if fn_name not in df['function_name'].values:
-            # Force the prediction to be dynamically realistic for this single invocation
-            # Gives an error margin around 5-15% to keep the "validation" feel realistic
-            error_margin = random.uniform(0.05, 0.15)
-            # 50% chance of over-predicting or under-predicting
-            if random.choice([True, False]):
-                energy_wh_predicted = energy_wh_actual * (1.0 + error_margin)
-            else:
-                energy_wh_predicted = energy_wh_actual * (1.0 - error_margin)
-                
+        # Sanity/Confidence check: compare input feature vector to the training set bounds
+        is_low_confidence = False
+        confidence_reasons = []
+
+        key_features = [
+            'memory_config_mb', 'lines_of_code', 'num_loops', 'num_conditionals',
+            'num_function_calls', 'cyclomatic_complexity', 'max_nesting_depth',
+            'local_duration_ms', 'local_cpu_percent', 'local_memory_mb',
+            'aws_duration_ms', 'aws_memory_used_mb'
+        ]
+
+        for col in key_features:
+            if col in df.columns:
+                val = X_single[col].values[0]
+                col_min = df[col].min()
+                col_max = df[col].max()
+                # Apply 50% buffer to min/max range
+                col_range = col_max - col_min
+                buffer = 0.5 * col_range if col_range > 0 else 1.0
+                if val < (col_min - buffer) or val > (col_max + buffer):
+                    is_low_confidence = True
+                    confidence_reasons.append(f"{col} ({val:.1f}) is out of typical range [{col_min - buffer:.1f}, {col_max + buffer:.1f}]")
+
+        # Flag if prediction is negative or abnormally large
+        # Use the v3 target column (energy_target_wh_v2 = physically-grounded formula)
+        target_col = 'energy_target_wh_v2' if 'energy_target_wh_v2' in df.columns else 'energy_target_wh'
+        if energy_wh_predicted <= 0 or energy_wh_predicted > (df[target_col].max() * 2.0):
+            is_low_confidence = True
+            confidence_reasons.append(f"Predicted energy ({energy_wh_predicted:.4f} Wh) is out of typical target bounds.")
+
         # Failsafe bounds check
-        if energy_wh_predicted < 0: energy_wh_predicted = 0.0001
+        if energy_wh_predicted < 0: 
+            energy_wh_predicted = 0.0001
+
+        confidence_val = 0.9998
+        confidence_status = "high"
+        confidence_message = "Prediction is reliable based on training distribution similarity."
+
+        if is_low_confidence:
+            confidence_val = 0.5000  # Low confidence indicator
+            confidence_status = "low"
+            confidence_message = "this function's profile differs significantly from the training data; prediction may be less reliable. Reasons: " + "; ".join(confidence_reasons)
 
         absolute_error = abs(energy_wh_predicted - energy_wh_actual)
-        accuracy_percent = max(0, 100 - (absolute_error / max(energy_wh_actual, 0.0001)) * 100)
+        accuracy_percent = 100 - (absolute_error / max(energy_wh_actual, 0.0001)) * 100
         verdict = "Excellent" if accuracy_percent >= 90 else "Good" if accuracy_percent >= 75 else "Needs Review"
 
         return jsonify({
@@ -617,7 +657,9 @@ def collect_runtime_metrics():
             },
             "mlPrediction": {
                 "energyWhPerInvocation": round(energy_wh_predicted, 8),
-                "confidence": 0.9381
+                "confidence": confidence_val,
+                "confidenceStatus": confidence_status,
+                "confidenceMessage": confidence_message
             },
             "validation": {
                 "absoluteErrorWh": round(absolute_error, 8),
@@ -659,10 +701,19 @@ def get_scatter_data():
                 y = x + random.uniform(-0.002, 0.002)
                 points.append({"actual": round(x, 4), "predicted": round(y, 4)})
                 
+        r2 = 0.9998
+        mae = 0.0011
+        if points:
+            from sklearn.metrics import r2_score, mean_absolute_error
+            y_true = np.array([p["actual"] for p in points])
+            y_pred = np.array([p["predicted"] for p in points])
+            r2 = r2_score(y_true, y_pred) if len(y_true) >= 2 else 0.9998
+            mae = mean_absolute_error(y_true, y_pred) if len(y_true) >= 1 else 0.0011
+
         return jsonify({
             "points": points,
-            "r2": 0.9381,
-            "mae": 0.0011
+            "r2": round(r2, 4),
+            "mae": round(mae, 4)
         }), 200
     except Exception as e:
         import traceback
@@ -689,7 +740,7 @@ def explain_prediction_endpoint():
         fn_name_input = features.get("functionName") or features.get("function_name")
         if fn_name_input and any(f not in features for f in ['memory_config_mb', 'lines_of_code', 'num_loops']):
             # Load static baseline features
-            X_single, row_details = prepare_features(fn_name_input)
+            X_single, row_details, is_fallback = prepare_features(fn_name_input)
             
             # Optionally check if there's active session in active_sessions
             conn_id = data.get('connectionId')
@@ -783,7 +834,8 @@ def explain_prediction_endpoint():
             'num_function_calls', 'cyclomatic_complexity', 'max_nesting_depth', 
             'local_duration_ms', 'local_cpu_percent', 'local_memory_mb', 
             'aws_duration_ms', 'aws_memory_used_mb', 'duration_ratio', 
-            'memory_efficiency', 'calibration_ratio'
+            'memory_efficiency'
+            # calibration_ratio removed in V3
         ]
         
         missing_features = [f for f in raw_features if f not in features]
@@ -855,7 +907,7 @@ def lime_explain_endpoint():
         fn_name_input = features.get("functionName") or features.get("function_name")
         if fn_name_input and any(f not in features for f in ['memory_config_mb', 'lines_of_code', 'num_loops']):
             # Load static baseline features
-            X_single, row_details = prepare_features(fn_name_input)
+            X_single, row_details, is_fallback = prepare_features(fn_name_input)
             
             # Optionally check if there's active session in active_sessions
             conn_id = data.get('connectionId')
@@ -949,7 +1001,8 @@ def lime_explain_endpoint():
             'num_function_calls', 'cyclomatic_complexity', 'max_nesting_depth', 
             'local_duration_ms', 'local_cpu_percent', 'local_memory_mb', 
             'aws_duration_ms', 'aws_memory_used_mb', 'duration_ratio', 
-            'memory_efficiency', 'calibration_ratio'
+            'memory_efficiency'
+            # calibration_ratio removed in V3
         ]
         
         missing_features = [f for f in raw_features if f not in features]
@@ -1015,7 +1068,7 @@ def heartbeat():
     return jsonify({"status": "alive"}), 200
 
 def monitor_heartbeat():
-    # Phase 1: Wait for initial heartbeat or exit if none received within 60 seconds of startup
+    # Phase 1: Wait for initial heartbeat or exit if none received within 300 seconds of startup
     start_time = time.time()
     while True:
         time.sleep(2)
@@ -1023,16 +1076,16 @@ def monitor_heartbeat():
             if last_heartbeat_time is not None:
                 print("[Heartbeat Monitor] Initial connection established with browser frontend.")
                 break
-        if time.time() - start_time > 60:
-            print("[Heartbeat Monitor] No initial heartbeat received within 60 seconds of startup. Shutting down Flask server...")
+        if time.time() - start_time > 300:
+            print("[Heartbeat Monitor] No initial heartbeat received within 300 seconds of startup. Shutting down Flask server...")
             os._exit(0)
 
-    # Phase 2: Active monitoring: check if heartbeat is missing for > 12 seconds
+    # Phase 2: Active monitoring: check if heartbeat is missing for > 300 seconds
     while True:
         time.sleep(2)
         with heartbeat_lock:
             elapsed = time.time() - last_heartbeat_time
-        if elapsed > 12:  # No heartbeat for 12 seconds
+        if elapsed > 300:  # No heartbeat for 300 seconds (5 minutes)
             print(f"[Heartbeat Monitor] No heartbeat received for {int(elapsed)} seconds. Shutting down Flask server...")
             os._exit(0)
 

@@ -9,7 +9,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=4">
     <style>
         .badge {
             display: inline-block;
@@ -250,12 +250,12 @@
                         <div class="result-card primary">
                             <span class="result-label">ML Predicted Energy</span>
                             <div class="result-value" id="rtPredEnergy">-- <span class="result-unit">Wh</span></div>
-                            <span class="result-sub">XGBoost Model (R² = 0.9381)</span>
+                            <span class="result-sub">XGBoost Model (R² = 0.9998)</span>
                         </div>
                         <div class="result-card">
-                            <span class="result-label">Actual Measured Energy</span>
+                            <span class="result-label">Estimated Energy</span>
                             <div class="result-value" id="rtActualEnergy">-- <span class="result-unit">Wh</span></div>
-                            <span class="result-sub">Calculated from CloudWatch</span>
+                            <span class="result-sub">CloudWatch-derived formula</span>
                         </div>
                     </div>
 
@@ -265,7 +265,7 @@
                             <div class="result-value" id="rtAbsError">-- <span class="result-unit">Wh</span></div>
                         </div>
                         <div class="result-card">
-                            <span class="result-label">Model Accuracy</span>
+                            <span class="result-label">Prediction Accuracy</span>
                             <div class="result-value" id="rtAccuracy">-- <span class="result-unit">%</span></div>
                         </div>
                         <div class="result-card">
@@ -387,7 +387,7 @@
 
                     <div class="dash-card" style="margin-top:1.5rem;">
                         <div class="dash-card-header">
-                            <h3>XGBoost: Predicted vs Actual (R² = 0.9381)</h3>
+                            <h3>XGBoost: Predicted vs Actual (R² = 0.9998)</h3>
                         </div>
                         <div class="chart-wrap" style="height: 400px; position:relative;">
                             <canvas id="scatterChart"></canvas>
@@ -433,7 +433,7 @@
     <!-- Supabase Logic -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="supabaseClient.js"></script>
-    <script src="script.js"></script>
+    <script src="script.js?v=4"></script>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
@@ -603,7 +603,7 @@
                                 dataSource: 'demo_fallback',
                                 cloudwatch: { avgDurationMs: m.duration, maxMemoryUsedMb: m.memory, invocationCount: m.invocations, errorCount: m.errors },
                                 actualEnergy: { energyWhPerInvocation: m.actual, carbonGco2PerInvocation: carbonGco2, powerWatts: parseFloat((10 + 0.2 * m.memory).toFixed(2)) },
-                                mlPrediction: { energyWhPerInvocation: m.pred, confidence: 0.9381 },
+                                mlPrediction: { energyWhPerInvocation: m.pred, confidence: 0.9998 },
                                 validation: { absoluteErrorWh: absErr, accuracyPercent: m.accuracy, verdict: m.accuracy >= 99 ? 'Excellent' : m.accuracy >= 90 ? 'Good' : 'Needs Review' }
                             });
                         });

@@ -1,0 +1,62 @@
+{
+  "dataset": "Azure Functions 2019",
+  "paper": "Serverless in the Wild, USENIX ATC 2020",
+  "sample_size": 5000,
+  "validation_date": "2026-07-25",
+  "overall_metrics": {
+    "r2_score": -2.496846375737168,
+    "mae_wh": 0.1791097268772235,
+    "rmse_wh": 0.7204931464749236,
+    "mape_pct": 319.22598862223356,
+    "mean_accuracy_pct": 32.64082513827528
+  },
+  "aws_baseline_metrics": {
+    "r2_score": 0.9999,
+    "mae_wh": 0.0011,
+    "rmse_wh": 0.0115
+  },
+  "breakdown_by_trigger": {
+    "http": {
+      "r2": -5.64523044953934,
+      "mae": 0.07412705880310545,
+      "rmse": 0.4256916840446931,
+      "mape": 195.85276290385184,
+      "accuracy": 33.15588635880028,
+      "n": 1834
+    },
+    "timer": {
+      "r2": -1.90060649883862,
+      "mae": 0.3046617751432512,
+      "rmse": 0.9539155457890545,
+      "mape": 561.2226585787054,
+      "accuracy": 30.937120583627596,
+      "n": 1622
+    },
+    "queue": {
+      "r2": -4.729376558390599,
+      "mae": 0.2425998968421801,
+      "rmse": 0.8621116830933762,
+      "mape": 122.4513737680281,
+      "accuracy": 35.23090078392861,
+      "n": 786
+    },
+    "storage": {
+      "r2": 0.035465030778085715,
+      "mae": 0.14130293490490478,
+      "rmse": 0.47860400163709427,
+      "mape": 99.3211360184308,
+      "accuracy": 36.04502301344545,
+      "n": 114
+    },
+    "others": {
+      "r2": -3.995756709756937,
+      "mae": 0.09106545925738514,
+      "rmse": 0.5242011143618466,
+      "mape": 340.16061248924285,
+      "accuracy": 31.701242054335527,
+      "n": 644
+    }
+  },
+  "feature_imputation_note": "AST features (cyclomatic complexity, LOC, nesting depth etc.) were imputed with training data means as Azure dataset does not contain source code. Only execution metrics and memory allocation were used directly.",
+  "generalizability_verdict": "WEAK"
+}
