@@ -13,9 +13,9 @@ Serverless computing obscures energy usage. Current profiling tools focus entire
 
 **Green Lambda** bridges this gap:
 1. **Extracts Features:** Mines static attributes (cyclomatic complexity, code nesting, lines of code) and dynamic AWS metrics (memory provisions, cold starts) via local code analysis and cloud telemetry.
-2. **ML Predictions:** Processes variables through highly-trained Machine Learning algorithms (XGBoost, Random Forest, Neural Networks).
-3. **Explains Predictions:** Integrates SHAP (SHapley Additive exPlanations) to transparently explain which specific parameters (e.g., memory configuration vs. loop counts) drove the prediction.
-4. **Simulates Demand:** Stress-tests applications across customizable timelines to project real-world carbon usage and precise billing (INR) impacts at scale during traffic spikes.
+2. **ML Predictions:** Processes variables through highly-trained Machine Learning algorithms (XGBoost, Random Forest, Neural Networks) predicting on a physically grounded formula: `Energy (Wh) = ((10 + 0.2 × memory_mb) × duration_ms) / 3600000`.
+3. **Explains Predictions:** Integrates SHAP (SHapley Additive exPlanations) and LIME to transparently explain which specific parameters (e.g., memory configuration vs. loop counts) drove the prediction.
+4. **Simulates Demand:** Stress-tests applications across customizable timelines to project real-world carbon usage and precise billing impacts at scale during traffic spikes.
 
 ---
 
@@ -23,23 +23,19 @@ Serverless computing obscures energy usage. Current profiling tools focus entire
 
 - **Live AWS Telemetry Integration:** Using Boto3, Green Lambda syncs securely with your AWS account to discover deployed functions and continuously extract CloudWatch `Duration` and `MaxMemoryUsed` data.
 - **Continuous AST Profiling:** Dynamically fetches raw Lambda code bundles and scans them locally using Python Abstract Syntax Trees (`radon`) for deep complexity metrics.
-- **High-Accuracy ML Engine:** Houses three predictive models trained on serverless execution datasets:
-  - **XGBoost (Active Model Mode)**
-  - **Random Forest**
-  - **Deep Neural Networks (MLPRegressor)**
-- **Multi-Model SHAP Interpretability Stack:** Provides real-time, local feature attribution. Supports:
-  - XGBoost & Random Forest via TreeExplainer
-  - Deep Neural Network via KernelExplainer (accelerated via k-means background sampling)
-  - Interactive dual-tab display mapping exact feature impacts (color-coded red/green glows indicating increase/decrease) and model baseline contribution progress flow.
-  - Actionable summaries highlighting code-level complexity drivers (e.g., loops, LOC) alongside memory config parameters.
-- **Prediction Gap Analysis (Validation):** Dynamically compares CloudWatch telemetry (actual energy) with ML predictions to diagnose deviation gaps in real-time. Highlights minor vs. significant deviations with amber/red severity badges, visualizes the gap's drivers in a mini-SHAP chart, and gives automated optimization suggestions.
-- **Demand Burst Simulation:** Stress tests applications across customizable timelines (e.g., 72 hours) allowing DevOps teams to actively multiply baseline load and predict carbon penalties during viral traffic events.
-- **IEEE Paper Figures Exporter:** Contains a publication-quality figure exporter (`export_shap_figures.py`) that outputs 300 DPI figures with light/white backgrounds for academic submissions:
-  1. Global Feature Importance Bar Chart (`fig1_global_importance.png`)
-  2. SHAP Summary Beeswarm Plot (`fig2_shap_summary.png`)
-  3. Local Explanation Waterfall Plot (`fig3_local_waterfall.png`)
-  4. Model Performance Comparison Chart (`fig4_model_comparison.png`)
+- **High-Accuracy ML Engine:** Houses three predictive models trained on a robust serverless execution dataset:
+  - **XGBoost (Active Model Mode):** R² = 0.9998, MAPE = 2.41%
+  - **Random Forest:** R² = 0.9993, MAPE = 6.70%
+  - **Deep Neural Networks (MLPRegressor):** R² = 0.9997, MAPE = 71.64%
+- **Multi-Model SHAP/LIME Interpretability Stack:** Provides real-time, local feature attribution highlighting actionable summaries highlighting code-level complexity drivers (e.g., loops, LOC) alongside memory config parameters.
+- **Prediction Gap Analysis (Validation):** Dynamically compares CloudWatch telemetry (Formula-based actual energy) with ML predictions to diagnose deviation gaps in real-time. Highlights minor vs. significant deviations with amber/red severity badges, visualizes the gap's drivers in a mini-SHAP chart, and gives automated optimization suggestions.
+- **Cross-Platform Transferability Insights:** Models have been validated against traces from Alibaba Cloud (Strong transfer: R² = 0.6997) and Microsoft Azure (Weak transfer: R² = -2.497).
 - **Interactive UI Dashboard:** A purely front-end client written seamlessly with standard HTML/JS, leveraging Chart.js for energy distribution comparisons and GSAP for fluid web animations.
+
+## ⚠️ Known Limitations
+- **Weak Azure Generalization:** As noted above, the model struggles to generalize to Azure (R² = -2.497). Azure dynamically allocates memory on a continuous spectrum (unlike AWS/Alibaba's discrete configurations) and exhibits higher variance skew, limiting the model's out-of-the-box accuracy on Azure.
+- **Sub-1-Second Inaccuracy:** Model reliability drops (higher relative error percentage) for functions completing in under 1 second (e.g., sub-10ms), as fixed invocation and runtime overheads heavily distort the baseline energy.
+- **Prediction Clipping:** Extreme outlier configurations (ultra-high memory combined with ultra-short execution durations) may result in negative energy predictions, requiring a floor clipping layer at 0.0001 Wh.
 
 ---
 
@@ -58,15 +54,25 @@ Serverless computing obscures energy usage. Current profiling tools focus entire
 **Machine Learning (Models & Interpretability):**
 - **xgboost**, **scikit-learn** (Model wrappers, scaling, metrics).
 - **pandas**, **numpy** (Matrix operations & Dataset Handling).
-- **SHAP** (Mathematical game-theoretic explanations for predictions).
+- **SHAP** & **LIME** (Mathematical game-theoretic explanations for predictions).
 - **matplotlib** (For publication-quality academic figure generation).
+
+---
+
+## 📊 Dataset Overview
+The model is trained on a comprehensive dataset compiled from executed serverless workloads:
+- **175 Lambda Functions:** (25 original benchmarks + 150 expansion functions, sourced/adapted from the Serverless Benchmark Suite / SeBS)
+- **6,132 Execution Records** across 8 workload categories
+- **Memory Range:** 128 MB to 3,000 MB
+- **Duration Range:** up to 66.9 seconds
+- **Lambda Runtime:** Python 3.11 exclusively
 
 ---
 
 ## 🚀 Setup & Installation
 
 ### Prerequisites
-- **Python 3.9+**
+- **Python 3.13.5**
 - **AWS Account** with Read-Only Lambda and CloudWatch execution permissions (If connecting Live AWS).
 
 ### Getting Started
@@ -84,7 +90,7 @@ For Windows users, we provide a unified startup script to streamline backend ini
    ```cmd
    Start_GreenLambda.bat
    ```
-   > *Note:* This batch script automatically activates the machine learning virtual model, boots up the local Flask server on Port 5000, and opens the frontend UI in your default web browser!
+   > *Note:* This batch script automatically activates the machine learning virtual environment, boots up the local Flask server on Port 5000, and opens the frontend UI in your default web browser!
 
 3. **Manual Launch:**
    *Setting up the backend:*
@@ -99,12 +105,22 @@ For Windows users, we provide a unified startup script to streamline backend ini
    *Opening the frontend:*
    Simply open `index.html` in your web browser of choice.
 
-4. **Generating Academic Figures (LaTeX/IEEE Paper):**
-   Run the exporter script from the backend directory to update the academic images at `/ml_model/figures/`:
-   ```bash
-   cd backend
-   python export_shap_figures.py
-   ```
+---
+
+## 🔬 Reproducibility Details
+To reproduce the findings in our research, ensure your environment matches the following configurations:
+- **Python Version:** 3.13.5
+- **Library Versions:**
+  - XGBoost: `3.2.0`
+  - scikit-learn: `1.8.0`
+  - pandas: `3.0.1`
+  - numpy: `2.4.3`
+  - SHAP: `0.51.0`
+  - LIME: `0.2.0.1`
+  - radon: `6.0.1`
+  - boto3: `1.42.73`
+- **Random Seed:** A fixed seed of `random_state=42` is used strictly across all scripts for train/test splits, cross-validation, and model initializations.
+- **Infrastructure:** Run entirely on standard, unmodified AWS Lambda; no special infrastructure access or instrumentation was required. Training hardware consisted of standard desktop/laptop CPUs.
 
 ---
 
@@ -126,16 +142,16 @@ For Windows users, we provide a unified startup script to streamline backend ini
 │   ├── app.py                  # Core Flask REST Application
 │   ├── model_loader.py         # Singleton loader for ML models and scaler
 │   ├── shap_explainer.py       # Multi-model SHAP explanation engine
-│   ├── export_shap_figures.py  # Exporter utility for IEEE publication figures
 │   ├── models/                 # Pre-trained XGBoost, RF, NN (.pkl files)
 │   └── results/                # Output metrics, comparison logs, and cached charts
 │
 └── ml_model/
-    ├── model.ipynb             # Jupyter Notebook detailing Model Training
-    ├── venv/                   # Active Python virtual environment 
-    ├── final_ml_dataset_clean.csv # Deep Serverless parameter dataset
-    └── figures/                # 300 DPI exported academic figures (PNGs)
+    ├── train_v3.py             # Script for Model Training
+    ├── final_ml_dataset_clean.csv # Core Serverless parameter dataset
+    └── new_ml_dataset.csv      # Processed dataset file
 ```
+
+*(Note: The `export_shap_figures.py` script has been deprecated from the main pipeline as the V3 figures are now manually generated via `generate_v3_figures.py` as needed.)*
 
 ---
 
@@ -144,7 +160,7 @@ For Windows users, we provide a unified startup script to streamline backend ini
 Green Lambda requires AWS `Access Key ID` and `Secret Access Key` exclusively to pull metric summaries and Lambda code zip files strictly for AST parsing on your local machine.
 
 - **No Data Harvesting:** Credentials are mathematically retained purely in the localized running Flask session and never uploaded to public databases.
-- **Demo Mode:** If you do not have an AWS account on hand, the application supports a built-in Demo mode that falls back to localized historical metrics and deterministic hashes of custom function names to vividly display the power of the ML engine safely.
+- **Demo Mode:** If you do not have an AWS account on hand, the application supports a built-in Demo mode that falls back to dataset median/mode imputation for unrecognized functions, clearly flagged with reduced confidence to distinguish it from genuine live predictions.
 
 ---
 
