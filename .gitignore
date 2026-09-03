@@ -1,31 +1,20 @@
-# Node Modules
-node_modules/
-package-lock.json
-
-# Python Virtual Environments
-venv/
-env/
-ml_model/venv/
-backend/venv/
 .env
-
-# Cache & Compiled Files
+backend/.env
+*.env
 __pycache__/
+pycache/
 *.pyc
 *.pyo
 *.pyd
-
-# OS generated files
+ml_model/venv/
+ml_model/azure_validation/raw/
+*.pkl
+!backend/models/*.pkl
+node_modules/
+package-lock.json
 .DS_Store
 Thumbs.db
-
-# Jupyter Notebook configs
 .ipynb_checkpoints/
-
-# AWS Credentials / Secrets
 aws_session.json
 backend/aws_session.json
 models_backup_*.zip
-ml_model/alibaba_validation/raw/
-ml_model/azure_validation/raw/
-

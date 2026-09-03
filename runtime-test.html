@@ -554,10 +554,12 @@
                 banner.innerHTML = `<span>⚡ Collecting CloudWatch metrics for <strong>${fnName}</strong>...</span>`;
 
                 // Read credentials saved to localStorage at connect time
-                const ak = localStorage.getItem('gl_ak');
-                const sk = localStorage.getItem('gl_sk');
-                const st = localStorage.getItem('gl_st') || null;
-                const region = localStorage.getItem('gl_region') || session?.region || 'ap-south-1';
+                const activeAwsSession = typeof checkSessionExpiry === 'function' ? checkSessionExpiry() : JSON.parse(localStorage.getItem('awsSession') || 'null');
+                const ak = activeAwsSession?.accessKeyId || localStorage.getItem('gl_ak');
+                const sk = activeAwsSession?.secretAccessKey || localStorage.getItem('gl_sk');
+                const st = activeAwsSession?.sessionToken || localStorage.getItem('gl_st') || null;
+                const region = activeAwsSession?.region || localStorage.getItem('gl_region') || session?.region || 'ap-south-1';
+                const apiBase = typeof getApiBase === 'function' ? getApiBase() : 'http://localhost:5000';
 
                 // Debug: log what we have
                 console.log('[Runtime Test] ak:', ak ? 'SET ✅' : 'MISSING ❌');
@@ -577,7 +579,7 @@
 
                     if (!isDemo) {
                         // Real account: send credentials directly to backend
-                        fetchPromise = fetch('http://localhost:5000/collect-runtime-metrics', {
+                        fetchPromise = fetch(`${apiBase}/collect-runtime-metrics`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
@@ -589,7 +591,7 @@
                             })
                         }).then(async (res) => {
                             const d = await res.json();
-                            if (!res.ok) throw new Error(d.error || 'Failed to collect metrics');
+                            if (!res.ok) throw new Error(d.error || d.message || 'Failed to collect metrics');
                             return d;
                         });
                     } else {
@@ -896,7 +898,8 @@
             // Fetch Scatter Data and render Chart.js Scatter Plot automatically
             async function loadScatterData() {
                 try {
-                    const res = await fetch('http://localhost:5000/scatter-data');
+                    const apiBase = typeof getApiBase === 'function' ? getApiBase() : 'http://localhost:5000';
+                    const res = await fetch(`${apiBase}/scatter-data`);
                     if (!res.ok) throw new Error('Network response was not ok');
                     const data = await res.json();
                     
@@ -1202,12 +1205,14 @@
                     return;
                 }
 
-                const ak = localStorage.getItem('gl_ak');
-                const sk = localStorage.getItem('gl_sk');
-                const st = localStorage.getItem('gl_st') || null;
-                const region = localStorage.getItem('gl_region') || null;
+                const activeAwsSession = typeof checkSessionExpiry === 'function' ? checkSessionExpiry() : JSON.parse(localStorage.getItem('awsSession') || 'null');
+                const ak = activeAwsSession?.accessKeyId || localStorage.getItem('gl_ak');
+                const sk = activeAwsSession?.secretAccessKey || localStorage.getItem('gl_sk');
+                const st = activeAwsSession?.sessionToken || localStorage.getItem('gl_st') || null;
+                const region = activeAwsSession?.region || localStorage.getItem('gl_region') || null;
+                const apiBase = typeof getApiBase === 'function' ? getApiBase() : 'http://localhost:5000';
 
-                fetch('http://localhost:5000/explain-prediction', {
+                fetch(`${apiBase}/explain-prediction`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ 

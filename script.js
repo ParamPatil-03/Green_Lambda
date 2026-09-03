@@ -1266,8 +1266,49 @@ const GREENLAMBDA_KEYS = {
     session: 'greenlambda.session',
     analysis: 'greenlambda.analysis',
     forecast: 'greenlambda.forecast',
-    apiBase: 'greenlambda.apiBase'
+    apiBase: 'greenlambda.apiBase',
+    awsSession: 'awsSession'
 };
+
+// API Configuration
+const API_BASE_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+    ? 'http://localhost:5000'
+    : 'https://your-production-api.railway.app';
+
+const DEMO_KEY = 'DEMO-MODE-ONLY';
+
+// SECURITY NOTE: Storing AWS credentials in
+// localStorage is only acceptable for development.
+// For production, credentials should be handled
+// server-side with session tokens only.
+// Store with expiry timestamp (4 hour session)
+function checkSessionExpiry() {
+    try {
+        const session = JSON.parse(localStorage.getItem('awsSession') || 'null');
+        if (session && session.expiresAt && Date.now() > session.expiresAt) {
+            localStorage.removeItem('awsSession');
+            localStorage.removeItem('gl_ak');
+            localStorage.removeItem('gl_sk');
+            localStorage.removeItem('gl_st');
+            localStorage.removeItem('gl_region');
+            console.warn('[Green Lambda] AWS session expired');
+            // Redirect to connect page if on a protected workflow page
+            const path = window.location.pathname || window.location.href;
+            if (!path.includes('connect') && !path.includes('login') && !path.includes('index')) {
+                window.location.href = 'connect.html';
+            }
+            return null;
+        }
+        return session;
+    } catch {
+        return null;
+    }
+}
+
+// Check session expiry on every page load
+document.addEventListener('DOMContentLoaded', checkSessionExpiry);
+// Check every 5 minutes while page is open
+setInterval(checkSessionExpiry, 5 * 60 * 1000);
 
 function getStoredJson(key) {
     try {
@@ -1291,7 +1332,7 @@ function setSession(session) {
 }
 
 function getApiBase() {
-    return window.GREENLAMBDA_API_BASE || localStorage.getItem(GREENLAMBDA_KEYS.apiBase) || 'http://127.0.0.1:5000';
+    return window.GREENLAMBDA_API_BASE || localStorage.getItem(GREENLAMBDA_KEYS.apiBase) || API_BASE_URL;
 }
 
 function toQuery(params) {
@@ -1806,18 +1847,31 @@ async function initConnectPage() {
 
         setSession(session);
 
-        // Save credentials to localStorage so runtime-test and other pages
-        // can make live CloudWatch calls directly.
+        // SECURITY NOTE: Storing AWS credentials in
+        // localStorage is only acceptable for development.
+        // For production, credentials should be handled
+        // server-side with session tokens only.
+        // Store with expiry timestamp (4 hour session)
         if (mode === 'live') {
+            const sessionData = {
+                accessKeyId: payload.accessKeyId,
+                secretAccessKey: payload.secretAccessKey,
+                sessionToken: payload.sessionToken || null,
+                region: payload.region,
+                expiresAt: Date.now() + (4 * 60 * 60 * 1000)
+            };
+            localStorage.setItem('awsSession', JSON.stringify(sessionData));
             localStorage.setItem('gl_ak', payload.accessKeyId);
             localStorage.setItem('gl_sk', payload.secretAccessKey);
             if (payload.sessionToken) localStorage.setItem('gl_st', payload.sessionToken);
             localStorage.setItem('gl_region', payload.region);
-            console.log('✅ AWS credentials saved to localStorage for live session.');
+            console.log('✅ AWS credentials saved to localStorage with 4-hour expiry.');
         } else {
+            localStorage.removeItem('awsSession');
             localStorage.removeItem('gl_ak');
             localStorage.removeItem('gl_sk');
             localStorage.removeItem('gl_st');
+            localStorage.removeItem('gl_region');
         }
         if (instructionsInfo) instructionsInfo.style.display = 'none';
         wrap.hidden = false;
@@ -3430,6 +3484,7 @@ async function checkAuthStatus() {
                         // SECURE PURGE: Completely destroy ALL mock data, cached AWS telemetry and credentials
                         localStorage.removeItem('green_lambda_demo_user');
                         localStorage.removeItem('greenlambda.session');
+                        localStorage.removeItem('awsSession');
                         localStorage.removeItem('gl_ak');
                         localStorage.removeItem('gl_sk');
                         localStorage.removeItem('gl_st');

@@ -2,11 +2,36 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import os
 import sys
+import threading
+import time
 
 # Ensure backend directory is in the import path
 BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
 if BACKEND_DIR not in sys.path:
     sys.path.insert(0, BACKEND_DIR)
+
+from dotenv import load_dotenv
+load_dotenv(os.path.join(BACKEND_DIR, '.env'))
+
+# Environment variables & Security Configurations
+FLASK_DEBUG = os.getenv('FLASK_DEBUG', 'False').lower() == 'true'
+FLASK_PORT = int(os.getenv('FLASK_PORT', 5000))
+SECRET_KEY = os.getenv('SECRET_KEY', 'fallback-dev-key')
+DEMO_MODE_KEY = os.getenv('DEMO_MODE_KEY', 'DEMO-MODE-ONLY')
+MAX_CONTENT_MB = int(os.getenv('MAX_CONTENT_LENGTH_MB', 5))
+RATE_LIMIT = os.getenv('RATE_LIMIT_PER_MINUTE', '30')
+
+# Verify critical environment variables on startup
+def check_env_vars():
+    warnings = []
+    if not os.getenv('SECRET_KEY'):
+        warnings.append("SECRET_KEY not set — using insecure default")
+    if os.getenv('FLASK_DEBUG', 'False').lower() == 'true' and os.getenv('FLASK_ENV') == 'production':
+        warnings.append("DEBUG mode enabled in production!")
+    for w in warnings:
+        print(f"[SECURITY WARNING] {w}")
+
+check_env_vars()
 
 import pickle
 import pandas as pd
@@ -16,9 +41,113 @@ import model_loader
 import shap_explainer
 import lime_explainer
 
-
 app = Flask(__name__)
-CORS(app)
+app.secret_key = SECRET_KEY
+app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_MB * 1024 * 1024
+
+# Restricted CORS
+raw_origins = os.getenv('ALLOWED_ORIGINS', 'http://localhost:5500,http://127.0.0.1:5500,http://localhost:5000,http://127.0.0.1:5000,null')
+allowed_origins = [o.strip() for o in raw_origins.split(',') if o.strip()]
+CORS(app, origins=allowed_origins, methods=['GET', 'POST', 'OPTIONS'], allow_headers=['Content-Type', 'Authorization'], max_age=3600)
+
+# Rate Limiter
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+
+limiter = Limiter(
+    app=app,
+    key_func=get_remote_address,
+    default_limits=[f"{RATE_LIMIT} per minute"],
+    storage_uri="memory://"
+)
+
+# Security Headers
+@app.after_request
+def add_security_headers(response):
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate'
+    if os.getenv('FLASK_ENV') == 'production':
+        response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+    return response
+
+# Reusable Input Validation Helpers
+def validate_json_request(required_fields=None, optional_fields=None):
+    """
+    Validates incoming JSON request.
+    Returns (data, error_response) tuple. If error_response is not None, return it immediately.
+    """
+    if not request.is_json:
+        return None, (jsonify({
+            'status': 'error',
+            'message': 'Request must be JSON with Content-Type: application/json'
+        }), 400)
+    try:
+        data = request.get_json(force=False, silent=True)
+    except Exception:
+        return None, (jsonify({
+            'status': 'error',
+            'message': 'Malformed JSON in request body'
+        }), 400)
+    if data is None:
+        return None, (jsonify({
+            'status': 'error',
+            'message': 'Empty or invalid JSON body'
+        }), 400)
+    if not isinstance(data, dict):
+        return None, (jsonify({
+            'status': 'error',
+            'message': 'Request body must be a JSON object'
+        }), 400)
+    if required_fields:
+        missing = [f for f in required_fields if f not in data]
+        if missing:
+            return None, (jsonify({
+                'status': 'error',
+                'message': f'Missing required fields: {", ".join(missing)}'
+            }), 400)
+    return data, None
+
+def safe_float(value, default=0.0, min_val=None, max_val=None):
+    """Safely convert value to float with bounds checking."""
+    try:
+        result = float(value)
+        if min_val is not None and result < min_val:
+            return default
+        if max_val is not None and result > max_val:
+            return default
+        return result
+    except (TypeError, ValueError):
+        return default
+
+def safe_int(value, default=0, min_val=None, max_val=None):
+    """Safely convert value to int with bounds checking."""
+    try:
+        result = int(value)
+        if min_val is not None and result < min_val:
+            return default
+        if max_val is not None and result > max_val:
+            return default
+        return result
+    except (TypeError, ValueError):
+        return default
+
+def sanitize_string(value, max_length=200, allow_empty=False):
+    """Sanitize string input."""
+    if not isinstance(value, str):
+        return None
+    value = value.strip()
+    if not allow_empty and not value:
+        return None
+    if len(value) > max_length:
+        return None
+    # Block path traversal and injection attempts
+    forbidden = ['..', '<', '>', ';', '|', '&', '`', '$', '{', '}']
+    if any(char in value for char in forbidden):
+        return None
+    return value
 
 # In-memory store: connectionId -> AWS credentials (server-side only, never sent to client)
 active_sessions = {}
@@ -65,9 +194,7 @@ def prepare_features(fn_name):
     if row.empty:
         is_fallback = True
         # Real function not in training set.
-        # Instead of borrowing another function's AST metrics (which causes identical predictions
-        # and misleading similarities), construct a row using the dataset median for numeric 
-        # features and mode for categorical features to represent a "typical" unseen function.
+        # Construct a row using the dataset median for numeric features and mode for categorical features
         row = pd.DataFrame([fn_lookup.median(numeric_only=True)])
         row['function_name'] = fn_name
         row['function_type'] = fn_lookup['function_type'].mode()[0]
@@ -82,7 +209,6 @@ def prepare_features(fn_name):
         return int(round(float(row[col].values[0])))
 
     # Reconstruct the exact feature columns before encoding
-    # All numeric types are explicitly cast here to avoid mixed object dtype after concat
     df_single = pd.DataFrame({
         'function_name': [fn_name if fn_name in df['function_name'].values else df['function_name'].iloc[0]],
         'function_type': [str(row['function_type'].values[0])],
@@ -102,7 +228,6 @@ def prepare_features(fn_name):
         'aws_memory_used_mb':    [fval('aws_memory_used_mb')],
         'duration_ratio':        [fval('duration_ratio')],
         'memory_efficiency':     [fval('memory_efficiency')],
-        # calibration_ratio removed in V3: it was a dataset-specific leakage feature
     })
 
     # Prepare base df: drop target/leakage columns
@@ -133,16 +258,41 @@ def prepare_features(fn_name):
 
     return X_single, row, is_fallback
 
-@app.route('/connect-aws', methods=['POST'])
-def connect_aws():
-    data = request.json
-    region = data.get('region', 'ap-south-1')
-    access_key = data.get('accessKeyId')
-    secret_key = data.get('secretAccessKey')
-    session_token = data.get('sessionToken')
+@app.route('/', methods=['GET'])
+@app.route('/health', methods=['GET'])
+@limiter.exempt
+def health_check():
+    """Health check endpoint for cloud load balancers and deployment verification."""
+    return jsonify({
+        "status": "healthy",
+        "service": "GreenLambda Backend API",
+        "version": "v3.0.0",
+        "models_loaded": list(models.keys()) if isinstance(models, dict) else []
+    }), 200
 
-    # Keep a dummy fallback active for safe college presentations without exposing real keys
-    if access_key == "TEST-KEY-123" or not access_key:
+@app.route('/connect-aws', methods=['POST'])
+@limiter.limit("10 per minute")
+def connect_aws():
+    data, err = validate_json_request(
+        required_fields=['accessKeyId', 'secretAccessKey', 'region']
+    )
+    if err:
+        return err
+
+    access_key = sanitize_string(data.get('accessKeyId', ''), max_length=50)
+    secret_key = sanitize_string(data.get('secretAccessKey', ''), max_length=100)
+    region = sanitize_string(data.get('region', 'ap-south-1'), max_length=30) or 'ap-south-1'
+    session_token = sanitize_string(data.get('sessionToken', ''), max_length=500, allow_empty=True)
+
+    if not access_key or not secret_key:
+        return jsonify({
+            'status': 'error',
+            'message': 'Access key and secret key are required'
+        }), 400
+
+    # Check for demo mode using env variable or legacy demo token
+    is_demo = (access_key == DEMO_MODE_KEY) or (access_key == "TEST-KEY-123") or (access_key == "DEMO-MODE-ONLY")
+    if is_demo:
         conn_id = f"demo-{int(pd.Timestamp.now().timestamp())}"
         return jsonify({
             "connectionId": conn_id,
@@ -200,17 +350,34 @@ def connect_aws():
         }), 200
 
     except Exception as e:
-        return jsonify({"error": f"AWS Connection Failed: {str(e)}"}), 401
+        print(f"[ERROR] connect_aws: {str(e)}")
+        return jsonify({"status": "error", "message": "AWS Connection Failed: Please verify your credentials and region."}), 401
 
 @app.route('/analyze-function', methods=['POST'])
+@limiter.limit("20 per minute")
 def analyze_function():
-    data = request.json
-    fn_name = data.get('functionName')
-    model_name = data.get('model', 'xgboost')
-    if model_name in ['neural_net', 'nn']: model_name = 'neural_network'
-    elif model_name == 'rf': model_name = 'random_forest'
+    data, err = validate_json_request(required_fields=['functionName'])
+    if err:
+        return err
+
+    fn_name = sanitize_string(data.get('functionName', ''), max_length=200)
+    if not fn_name:
+        return jsonify({
+            'status': 'error',
+            'message': 'Valid function name is required'
+        }), 400
+
+    model_name = sanitize_string(data.get('model') or data.get('modelType', 'xgboost'), max_length=50)
+    if not model_name:
+        model_name = 'xgboost'
+    if model_name in ['neural_net', 'nn']:
+        model_name = 'neural_network'
+    elif model_name == 'rf':
+        model_name = 'random_forest'
+    elif model_name not in ['xgboost', 'random_forest', 'neural_network']:
+        model_name = 'xgboost'
     
-    baseline_rph = float(data.get('baselineRph', 10000))
+    baseline_rph = safe_float(data.get('baselineRph', 10000), default=10000.0, min_val=1.0, max_val=10000000.0)
     
     model = models.get(model_name, models.get('xgboost'))
     
@@ -218,18 +385,14 @@ def analyze_function():
         X_single, row_details, is_fallback = prepare_features(fn_name)
         
         # ── AWS CLOUDWATCH LIVE EXTRACTION (Dynamic ML Features) ──
-        # In a full-auth environment, we extract keys via connectionId from DB.
-        # For the presentation, we attempt to pull AWS metrics, but gracefully fallback 
-        # to our historically accurate Dataset Averages (Demo Mode).
-        access_key = data.get('accessKeyId')
-        secret_key = data.get('secretAccessKey')
-        region = data.get('region', 'ap-south-1')
+        access_key = sanitize_string(data.get('accessKeyId', ''), max_length=50, allow_empty=True)
+        secret_key = sanitize_string(data.get('secretAccessKey', ''), max_length=100, allow_empty=True)
+        region = sanitize_string(data.get('region', 'ap-south-1'), max_length=30, allow_empty=True) or 'ap-south-1'
         
         live_duration_ms = None
-        if access_key and access_key != "TEST-KEY-123":
+        if access_key and access_key != DEMO_MODE_KEY and access_key != "TEST-KEY-123" and access_key != "DEMO-MODE-ONLY":
             try:
                 import boto3
-                from datetime import datetime, timedelta
                 cw = boto3.client('cloudwatch', 
                                   aws_access_key_id=access_key, 
                                   aws_secret_access_key=secret_key, 
@@ -277,7 +440,7 @@ def analyze_function():
                     with zipfile.ZipFile(zip_path, 'r') as zip_ref:
                         zip_ref.extractall(tmpdir)
                     
-                    # Run secure AST Scanner using Radon across all *.py files
+                    # Run AST Scanner using Radon across all *.py files
                     total_loc = 0
                     complexities = []
                     
@@ -350,20 +513,39 @@ def analyze_function():
         }), 200
 
     except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return jsonify({"error": str(e)}), 500
+        print(f"[ERROR] analyze_function: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': 'An internal error occurred during function analysis. Please try again.'
+        }), 500
 
 @app.route('/predict-spike', methods=['POST'])
+@limiter.limit("20 per minute")
 def predict_spike():
-    data = request.json
-    fn_name = data.get('functionName')
-    model_name = data.get('model', 'xgboost')
-    if model_name in ['neural_net', 'nn']: model_name = 'neural_network'
-    elif model_name == 'rf': model_name = 'random_forest'
-    baseline_rph = float(data.get('baselineRph', 10000))
-    multiplier = float(data.get('multiplier', 20))
-    duration_hours = int(data.get('durationHours', 72))
+    data, err = validate_json_request(required_fields=['functionName'])
+    if err:
+        return err
+
+    fn_name = sanitize_string(data.get('functionName', ''), max_length=200)
+    if not fn_name:
+        return jsonify({
+            'status': 'error',
+            'message': 'Valid function name is required'
+        }), 400
+
+    model_name = sanitize_string(data.get('model') or data.get('modelType', 'xgboost'), max_length=50)
+    if not model_name:
+        model_name = 'xgboost'
+    if model_name in ['neural_net', 'nn']:
+        model_name = 'neural_network'
+    elif model_name == 'rf':
+        model_name = 'random_forest'
+    elif model_name not in ['xgboost', 'random_forest', 'neural_network']:
+        model_name = 'xgboost'
+
+    baseline_rph = safe_float(data.get('baselineRph', 10000), default=10000.0, min_val=1.0, max_val=10000000.0)
+    multiplier = safe_float(data.get('multiplier', 20), default=20.0, min_val=1.0, max_val=1000.0)
+    duration_hours = safe_int(data.get('durationHours', 72), default=72, min_val=1, max_val=720)
     
     model = models.get(model_name, models.get('xgboost'))
     
@@ -416,28 +598,28 @@ def predict_spike():
         }), 200
 
     except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return jsonify({"error": str(e)}), 500
+        print(f"[ERROR] predict_spike: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': 'An internal error occurred during spike prediction. Please try again.'
+        }), 500
 
 @app.route('/live-metrics', methods=['GET'])
+@limiter.limit("30 per minute")
 def get_live_metrics():
     """
     Simulates real-time CloudWatch telemetry for the connected AWS account.
     Generates realistic hour-over-hour traffic deviations to demonstrate ML anomaly detection.
     """
     try:
-        fn_name = request.args.get('functionName', 'unknown-function')
+        fn_name = sanitize_string(request.args.get('functionName', 'unknown-function'), max_length=200)
+        predicted = safe_float(request.args.get('baselineRph', 10000), default=10000.0, min_val=1.0, max_val=10000000.0)
         
-        # Pull the mathematically predicted baseline traffic (passed from the Spike Analysis phase ideally)
-        # Using a solid baseline 10,000 for realistic simulation if none exists natively
-        predicted = float(request.args.get('baselineRph', 10000))
-        
-        # Generate mathematically robust, realistic internet traffic jitter (-5% to +6%)
+        # Generate robust, realistic internet traffic jitter (-5% to +6%)
         import random
         drift = random.uniform(-0.05, 0.06)
         
-        # 1-in-12 chance of simulating a massive Traffic Anomaly (DDoS or Virality event)
+        # 1-in-12 chance of simulating a massive Traffic Anomaly
         if random.random() < 0.08:
             drift = random.uniform(0.25, 0.45) # 25% to 45% sudden surge
             
@@ -451,21 +633,35 @@ def get_live_metrics():
         }), 200
         
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        print(f"[ERROR] get_live_metrics: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': 'An internal error occurred retrieving live metrics. Please try again.'
+        }), 500
 
 @app.route('/collect-runtime-metrics', methods=['POST'])
+@limiter.limit("15 per minute")
 def collect_runtime_metrics():
+    data, err = validate_json_request(required_fields=['functionName'])
+    if err:
+        return err
+
     try:
-        data = request.json
-        connection_id = data.get('connectionId')
-        region = data.get('region', 'ap-south-1')
-        fn_name = data.get('functionName')
+        connection_id = sanitize_string(data.get('connectionId', ''), max_length=100, allow_empty=True)
+        region = sanitize_string(data.get('region', 'ap-south-1'), max_length=30, allow_empty=True) or 'ap-south-1'
+        fn_name = sanitize_string(data.get('functionName', ''), max_length=200)
+
+        if not fn_name:
+            return jsonify({
+                'status': 'error',
+                'message': 'Valid function name is required'
+            }), 400
 
         # Look up real credentials by connectionId if available
         creds = active_sessions.get(connection_id, {})
-        access_key = creds.get('accessKeyId') or data.get('accessKeyId')
-        secret_key = creds.get('secretAccessKey') or data.get('secretAccessKey')
-        session_token = creds.get('sessionToken') or data.get('sessionToken')
+        access_key = creds.get('accessKeyId') or sanitize_string(data.get('accessKeyId', ''), max_length=50, allow_empty=True)
+        secret_key = creds.get('secretAccessKey') or sanitize_string(data.get('secretAccessKey', ''), max_length=100, allow_empty=True)
+        session_token = creds.get('sessionToken') or sanitize_string(data.get('sessionToken', ''), max_length=500, allow_empty=True)
         region = creds.get('region') or region
 
         data_source = "demo_fallback"
@@ -474,7 +670,7 @@ def collect_runtime_metrics():
         invocations = None
         errors = None
 
-        if access_key and access_key != "TEST-KEY-123":
+        if access_key and access_key != DEMO_MODE_KEY and access_key != "TEST-KEY-123" and access_key != "DEMO-MODE-ONLY":
             try:
                 import boto3
                 cw_kwargs = {
@@ -486,7 +682,7 @@ def collect_runtime_metrics():
                     cw_kwargs['aws_session_token'] = session_token
                 cw = boto3.client('cloudwatch', **cw_kwargs)
 
-                # Use 1-hour buckets over 24 hours to catch very recent (fresh) invocations
+                # Use 1-hour buckets over 24 hours to catch very recent invocations
                 end_time = datetime.utcnow()
                 start_time = end_time - timedelta(hours=24)
 
@@ -497,7 +693,7 @@ def collect_runtime_metrics():
                         Dimensions=[{'Name': 'FunctionName', 'Value': fn_name}],
                         StartTime=start_time,
                         EndTime=end_time,
-                        Period=3600,   # 1-hour buckets — catches single recent invocations
+                        Period=3600,   # 1-hour buckets
                         Statistics=[stat]
                     )
                     pts = res.get('Datapoints', [])
@@ -528,19 +724,15 @@ def collect_runtime_metrics():
                 invocations_tmp  = get_metric('Invocations', 'Sum')
                 errors_tmp       = get_metric('Errors', 'Sum')
 
-                # Real credentials were valid — use 0 for any missing metric
-                # rather than falling back to demo_fallback entirely
                 avg_duration = float(avg_duration_tmp) if avg_duration_tmp is not None else 0.0
                 max_mem      = float(max_mem_tmp)      if max_mem_tmp is not None      else 128.0
                 invocations  = float(invocations_tmp)  if invocations_tmp is not None  else 0.0
                 errors       = float(errors_tmp)       if errors_tmp is not None       else 0.0
 
-                # Mark as live — if ANY metric came back, it's a real live result
                 data_source = "live_aws" if any(x is not None for x in [avg_duration_tmp, invocations_tmp, max_mem_tmp]) else "live_aws_no_data"
 
             except Exception as e:
                 print(f"CloudWatch live fetch failed: {e}")
-                # Credentials were real but CloudWatch call failed — still not demo
                 data_source = "live_aws_error"
                 avg_duration = 0.0
                 max_mem      = 128.0
@@ -561,7 +753,6 @@ def collect_runtime_metrics():
                 "image-resizer":     {"duration": 740,   "memory": 486, "invocations": 7200,  "errors": 4}
             }
             if fn_name not in fallbacks:
-                # Deterministic zlib-hash lookup key from fallbacks dict to provide distinct mock data for custom names
                 import zlib
                 keys = list(fallbacks.keys())
                 idx = zlib.adler32(fn_name.encode('utf-8')) % len(keys)
@@ -594,7 +785,6 @@ def collect_runtime_metrics():
 
         energy_wh_predicted = float(model.predict(X_single)[0])
 
-        # Sanity/Confidence check: compare input feature vector to the training set bounds
         is_low_confidence = False
         confidence_reasons = []
 
@@ -610,21 +800,17 @@ def collect_runtime_metrics():
                 val = X_single[col].values[0]
                 col_min = df[col].min()
                 col_max = df[col].max()
-                # Apply 50% buffer to min/max range
                 col_range = col_max - col_min
                 buffer = 0.5 * col_range if col_range > 0 else 1.0
                 if val < (col_min - buffer) or val > (col_max + buffer):
                     is_low_confidence = True
                     confidence_reasons.append(f"{col} ({val:.1f}) is out of typical range [{col_min - buffer:.1f}, {col_max + buffer:.1f}]")
 
-        # Flag if prediction is negative or abnormally large
-        # Use the v3 target column (energy_target_wh_v2 = physically-grounded formula)
         target_col = 'energy_target_wh_v2' if 'energy_target_wh_v2' in df.columns else 'energy_target_wh'
         if energy_wh_predicted <= 0 or energy_wh_predicted > (df[target_col].max() * 2.0):
             is_low_confidence = True
             confidence_reasons.append(f"Predicted energy ({energy_wh_predicted:.4f} Wh) is out of typical target bounds.")
 
-        # Failsafe bounds check
         if energy_wh_predicted < 0: 
             energy_wh_predicted = 0.0001
 
@@ -633,7 +819,7 @@ def collect_runtime_metrics():
         confidence_message = "Prediction is reliable based on training distribution similarity."
 
         if is_low_confidence:
-            confidence_val = 0.5000  # Low confidence indicator
+            confidence_val = 0.5000
             confidence_status = "low"
             confidence_message = "this function's profile differs significantly from the training data; prediction may be less reliable. Reasons: " + "; ".join(confidence_reasons)
 
@@ -669,16 +855,18 @@ def collect_runtime_metrics():
         })
 
     except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return jsonify({"error": str(e)}), 500
+        print(f"[ERROR] collect_runtime_metrics: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': 'An internal error occurred during runtime metrics collection. Please try again.'
+        }), 500
 
 @app.route('/scatter-data', methods=['GET'])
+@limiter.limit("30 per minute")
 def get_scatter_data():
     try:
         import json
         import random
-        import os
         
         path1 = os.path.join(BASE_DIR, 'backend', 'results', 'scatter_data.json')
         path2 = os.path.join(BASE_DIR, 'scatter_data.json')
@@ -695,7 +883,6 @@ def get_scatter_data():
                 data = json.load(f)
                 points = [{"actual": p["x"], "predicted": p["y"]} for p in data]
         else:
-            # Synthetic fallback 60 points if file not found locally
             for _ in range(60):
                 x = random.uniform(0.1, 12.0)
                 y = x + random.uniform(-0.002, 0.002)
@@ -716,34 +903,37 @@ def get_scatter_data():
             "mae": round(mae, 4)
         }), 200
     except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return jsonify({"error": str(e)}), 500
+        print(f"[ERROR] get_scatter_data: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': 'An internal error occurred. Please try again.'
+        }), 500
 
 @app.route('/explain-prediction', methods=['POST'])
+@limiter.limit("20 per minute")
 def explain_prediction_endpoint():
     """
     Exposes prediction-level SHAP explanations to the frontend.
     Accepts flat or nested feature JSON and returns ranked contribution metrics.
     """
-    print("[SHAP] explain-prediction called")
+    data, err = validate_json_request()
+    if err:
+        return err
+
     try:
-        data = request.json or {}
-        
         # Flexibly unwrap nested 'features' structure if present
-        if "features" in data:
+        if "features" in data and isinstance(data["features"], dict):
             features = data["features"]
         else:
             features = data
             
         # Resolve features if functionName/function_name is provided but typical raw features are missing
         fn_name_input = features.get("functionName") or features.get("function_name")
-        if fn_name_input and any(f not in features for f in ['memory_config_mb', 'lines_of_code', 'num_loops']):
-            # Load static baseline features
+        if fn_name_input and isinstance(fn_name_input, str) and any(f not in features for f in ['memory_config_mb', 'lines_of_code', 'num_loops']):
+            fn_name_input = sanitize_string(fn_name_input, max_length=200)
             X_single, row_details, is_fallback = prepare_features(fn_name_input)
             
-            # Optionally check if there's active session in active_sessions
-            conn_id = data.get('connectionId')
+            conn_id = sanitize_string(data.get('connectionId', ''), max_length=100, allow_empty=True)
             creds = active_sessions.get(conn_id, {}) if conn_id else {}
             access_key = creds.get('accessKeyId')
             secret_key = creds.get('secretAccessKey')
@@ -751,7 +941,7 @@ def explain_prediction_endpoint():
             
             # If credentials found, do live CloudWatch duration/AST profiling
             live_duration_ms = None
-            if access_key and access_key != "TEST-KEY-123":
+            if access_key and access_key != DEMO_MODE_KEY and access_key != "TEST-KEY-123" and access_key != "DEMO-MODE-ONLY":
                 try:
                     import boto3
                     from datetime import datetime, timedelta
@@ -822,12 +1012,10 @@ def explain_prediction_endpoint():
             
             features = X_single.iloc[0].to_dict()
             
-        # Get required feature list from model_loader
         req_features = model_loader.get_feature_names()
         if not req_features:
             return jsonify({"status": "error", "message": "Feature list not loaded from model_loader."}), 500
             
-        # Validate that all required features are present
         raw_features = [
             'function_name', 'function_type', 'input_size', 'memory_config_mb', 
             'cold_start', 'lines_of_code', 'num_loops', 'num_conditionals', 
@@ -835,11 +1023,9 @@ def explain_prediction_endpoint():
             'local_duration_ms', 'local_cpu_percent', 'local_memory_mb', 
             'aws_duration_ms', 'aws_memory_used_mb', 'duration_ratio', 
             'memory_efficiency'
-            # calibration_ratio removed in V3
         ]
         
         missing_features = [f for f in raw_features if f not in features]
-        # If any raw features are missing, check if they passed the pre-encoded 34 features instead
         if missing_features:
             missing_encoded = [f for f in req_features if f not in features]
             if missing_encoded:
@@ -848,8 +1034,7 @@ def explain_prediction_endpoint():
                     "message": f"Missing required features: {', '.join(missing_features)}"
                 }), 400
                 
-        # Call the SHAP explanation generator with the requested model
-        model_name = data.get('model', 'xgboost')
+        model_name = sanitize_string(data.get('model', 'xgboost'), max_length=50) or 'xgboost'
         explanation = shap_explainer.explain_prediction(features, model_name=model_name)
         
         return jsonify({
@@ -858,19 +1043,18 @@ def explain_prediction_endpoint():
         }), 200
         
     except Exception as e:
-        import traceback
-        traceback.print_exc()
+        print(f"[ERROR] explain_prediction: {str(e)}")
         return jsonify({
             "status": "error",
-            "message": f"Internal SHAP error: {str(e)}"
+            "message": "An internal error occurred while generating explanation."
         }), 500
 
 @app.route('/global-importance', methods=['GET'])
+@limiter.limit("30 per minute")
 def get_global_importance_endpoint():
     """
     Exposes global-level SHAP importance rankings to the frontend.
     """
-    print("[SHAP] global-importance called")
     try:
         global_imp = shap_explainer.get_global_importance()
         return jsonify({
@@ -878,47 +1062,42 @@ def get_global_importance_endpoint():
             "global_importance": global_imp
         }), 200
     except Exception as e:
-        import traceback
-        traceback.print_exc()
+        print(f"[ERROR] global_importance: {str(e)}")
         return jsonify({
             "status": "error",
-            "message": f"Internal SHAP error: {str(e)}"
+            "message": "An internal error occurred retrieving global importance."
         }), 500
 
 @app.route('/lime-explain', methods=['POST'])
+@limiter.limit("10 per minute")
 def lime_explain_endpoint():
     """
     Exposes prediction-level LIME explanations to the frontend.
     Accepts flat or nested feature JSON and returns ranked contribution weights.
-    
-    Timing Note: LIME takes ~1-2 seconds per prediction due to perturbation.
     """
-    print("[LIME] lime-explain called")
+    data, err = validate_json_request()
+    if err:
+        return err
+
     try:
-        data = request.json or {}
-        
-        # Flexibly unwrap nested 'features' structure if present
-        if "features" in data:
+        if "features" in data and isinstance(data["features"], dict):
             features = data["features"]
         else:
             features = data
             
-        # Resolve features if functionName/function_name is provided but typical raw features are missing
         fn_name_input = features.get("functionName") or features.get("function_name")
-        if fn_name_input and any(f not in features for f in ['memory_config_mb', 'lines_of_code', 'num_loops']):
-            # Load static baseline features
+        if fn_name_input and isinstance(fn_name_input, str) and any(f not in features for f in ['memory_config_mb', 'lines_of_code', 'num_loops']):
+            fn_name_input = sanitize_string(fn_name_input, max_length=200)
             X_single, row_details, is_fallback = prepare_features(fn_name_input)
             
-            # Optionally check if there's active session in active_sessions
-            conn_id = data.get('connectionId')
+            conn_id = sanitize_string(data.get('connectionId', ''), max_length=100, allow_empty=True)
             creds = active_sessions.get(conn_id, {}) if conn_id else {}
             access_key = creds.get('accessKeyId')
             secret_key = creds.get('secretAccessKey')
             region = creds.get('region', 'ap-south-1')
             
-            # If credentials found, do live CloudWatch duration/AST profiling
             live_duration_ms = None
-            if access_key and access_key != "TEST-KEY-123":
+            if access_key and access_key != DEMO_MODE_KEY and access_key != "TEST-KEY-123" and access_key != "DEMO-MODE-ONLY":
                 try:
                     import boto3
                     from datetime import datetime, timedelta
@@ -943,7 +1122,6 @@ def lime_explain_endpoint():
                         live_duration_ms = sum(dp['Average'] for dp in cw_res['Datapoints']) / len(cw_res['Datapoints'])
                         X_single['aws_duration_ms'] = live_duration_ms
                         
-                    # Radon cc_visit AST
                     import requests
                     import tempfile
                     import zipfile
@@ -989,12 +1167,10 @@ def lime_explain_endpoint():
             
             features = X_single.iloc[0].to_dict()
             
-        # Get required feature list from model_loader
         req_features = model_loader.get_feature_names()
         if not req_features:
             return jsonify({"status": "error", "message": "Feature list not loaded from model_loader."}), 500
             
-        # Validate that all required features are present
         raw_features = [
             'function_name', 'function_type', 'input_size', 'memory_config_mb', 
             'cold_start', 'lines_of_code', 'num_loops', 'num_conditionals', 
@@ -1002,7 +1178,6 @@ def lime_explain_endpoint():
             'local_duration_ms', 'local_cpu_percent', 'local_memory_mb', 
             'aws_duration_ms', 'aws_memory_used_mb', 'duration_ratio', 
             'memory_efficiency'
-            # calibration_ratio removed in V3
         ]
         
         missing_features = [f for f in raw_features if f not in features]
@@ -1014,8 +1189,7 @@ def lime_explain_endpoint():
                     "message": f"Missing required features: {', '.join(missing_features)}"
                 }), 400
                 
-        # Call the LIME explanation generator with the requested model
-        model_name = data.get('model', 'xgboost')
+        model_name = sanitize_string(data.get('model', 'xgboost'), max_length=50) or 'xgboost'
         lime_explanation = lime_explainer.explain_with_lime(features, model_name=model_name)
         
         return jsonify({
@@ -1024,20 +1198,18 @@ def lime_explain_endpoint():
         }), 200
         
     except Exception as e:
-        import traceback
-        traceback.print_exc()
+        print(f"[ERROR] lime_explain: {str(e)}")
         return jsonify({
             "status": "error",
-            "message": f"Internal LIME error: {str(e)}"
+            "message": "An internal error occurred during LIME explanation."
         }), 500
 
 @app.route('/lime-global-importance', methods=['GET'])
+@limiter.limit("5 per minute")
 def get_lime_global_importance_endpoint():
     """
     Exposes global-level LIME importance rankings to the frontend.
-    Timing Note: LIME is computed on-demand here which takes ~50 seconds.
     """
-    print("[LIME] Computing global importance — this may take ~50s")
     try:
         global_imp = lime_explainer.get_lime_global_importance()
         return jsonify({
@@ -1045,22 +1217,50 @@ def get_lime_global_importance_endpoint():
             "global_importance": global_imp
         }), 200
     except Exception as e:
-        import traceback
-        traceback.print_exc()
+        print(f"[ERROR] lime_global_importance: {str(e)}")
         return jsonify({
             "status": "error",
-            "message": f"Internal LIME error: {str(e)}"
+            "message": "An internal error occurred retrieving LIME global importance."
         }), 500
 
 # --- HEARTBEAT MONITOR SYSTEM ---
-# Automatic shutdown when the browser frontend is closed
-import time
-import threading
-
 last_heartbeat_time = None
 heartbeat_lock = threading.Lock()
 
+def is_cloud_or_production():
+    """Detect if running in a cloud platform or production environment."""
+    flask_env = os.getenv('FLASK_ENV', '').lower()
+    app_env = os.getenv('ENVIRONMENT', '').lower()
+    if flask_env == 'production' or app_env == 'production':
+        return True
+    
+    # Explicit configuration override
+    disable_shutdown = os.getenv('DISABLE_AUTO_SHUTDOWN', '').lower()
+    if disable_shutdown in ('true', '1', 'yes'):
+        return True
+        
+    # Standard Cloud platform markers
+    cloud_env_vars = [
+        'RENDER',                 # Render.com
+        'RAILWAY_ENVIRONMENT',    # Railway.app
+        'AWS_EXECUTION_ENV',      # AWS Lambda / App Runner / ECS
+        'KUBERNETES_SERVICE_HOST',# Kubernetes
+        'DYNO',                   # Heroku
+        'FLY_APP_NAME',           # Fly.io
+        'VERCEL',                 # Vercel
+    ]
+    for env_var in cloud_env_vars:
+        if os.getenv(env_var):
+            return True
+            
+    # Gunicorn worker process detection
+    if 'gunicorn' in sys.modules or ('SERVER_SOFTWARE' in os.environ and 'gunicorn' in os.environ.get('SERVER_SOFTWARE', '').lower()):
+        return True
+
+    return False
+
 @app.route('/api/heartbeat', methods=['POST'])
+@limiter.exempt
 def heartbeat():
     global last_heartbeat_time
     with heartbeat_lock:
@@ -1068,6 +1268,10 @@ def heartbeat():
     return jsonify({"status": "alive"}), 200
 
 def monitor_heartbeat():
+    if is_cloud_or_production():
+        print("[Heartbeat Monitor] Production/Cloud environment detected. Auto-shutdown monitor disabled for persistent hosting.")
+        return
+
     # Phase 1: Wait for initial heartbeat or exit if none received within 300 seconds of startup
     start_time = time.time()
     while True:
@@ -1085,16 +1289,26 @@ def monitor_heartbeat():
         time.sleep(2)
         with heartbeat_lock:
             elapsed = time.time() - last_heartbeat_time
-        if elapsed > 300:  # No heartbeat for 300 seconds (5 minutes)
+        if elapsed > 300:
             print(f"[Heartbeat Monitor] No heartbeat received for {int(elapsed)} seconds. Shutting down Flask server...")
             os._exit(0)
 
-# Start monitor thread only in the main reloader worker process if in debug mode, or if not debugging
-if not app.debug or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
+is_testing = 'unittest' in sys.modules or 'pytest' in sys.modules or (len(sys.argv) > 0 and any('test' in arg.lower() for arg in sys.argv))
+
+# Start monitor thread only in local standalone server runtime (not tests, not cloud)
+if not is_testing and not is_cloud_or_production() and (not app.debug or os.environ.get('WERKZEUG_RUN_MAIN') == 'true'):
     t = threading.Thread(target=monitor_heartbeat, daemon=True)
     t.start()
+elif is_cloud_or_production():
+    print("[Heartbeat Monitor] Persistent mode active (Cloud/Production detected). Auto-shutdown disabled.")
 
 
 if __name__ == '__main__':
-    app.run(port=5000, debug=True)
+    debug_mode = os.getenv('FLASK_DEBUG', 'False').lower() == 'true'
+    port = int(os.getenv('FLASK_PORT', 5000))
+    print(f"[Green Lambda] Starting server...")
+    print(f"[Green Lambda] Debug mode: {debug_mode}")
+    print(f"[Green Lambda] Port: {port}")
+    print(f"[Green Lambda] Environment: {os.getenv('FLASK_ENV', 'development')}")
+    app.run(port=port, debug=debug_mode, host='0.0.0.0')
 
