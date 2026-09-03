@@ -27,5 +27,5 @@ COPY ml_model/ ./ml_model/
 # Expose default port
 EXPOSE 5000
 
-# Run with Gunicorn WSGI server
-CMD ["gunicorn", "--chdir", "backend", "app:app", "--bind", "0.0.0.0:5000", "--workers", "2", "--timeout", "120"]
+# Run with Gunicorn WSGI server (1 worker + threads to stay lean in 512MB RAM)
+CMD ["sh", "-c", "gunicorn --chdir backend app:app --bind 0.0.0.0:${PORT:-5000} --workers 1 --threads 4 --timeout 120"]
