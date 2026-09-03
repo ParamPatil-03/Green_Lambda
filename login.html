@@ -516,7 +516,6 @@
         .fc-status.error   { color: #ff3d71; }
         .fc-status.loading { color: var(--text-2); }
 
-        /* ─── Back link ─── */
         .back-link {
             font-family: var(--font);
             font-size: 0.76rem;
@@ -525,6 +524,36 @@
             transition: color 0.2s;
         }
         .back-link:hover { color: var(--accent); }
+
+        @media (max-width: 480px) {
+            body {
+                padding: 5rem 1rem 2rem 1rem;
+                gap: 20px;
+            }
+            .nav {
+                padding: 0 1rem;
+            }
+            .gl-card {
+                width: 100%;
+                max-width: 320px;
+            }
+            .gl-card2 {
+                width: 100%;
+            }
+            .flip-card-inner {
+                width: 100%;
+                min-width: 280px;
+                max-width: 320px;
+                height: 380px;
+            }
+            .flip-card-front,
+            .flip-card-back {
+                padding: 1.5em 1.2em;
+            }
+            .fc-input {
+                font-size: 16px;
+            }
+        }
     </style>
 </head>
 

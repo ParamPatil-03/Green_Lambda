@@ -782,6 +782,9 @@ function initNavigation() {
 
     links.forEach(link => {
         link.addEventListener('click', e => {
+            if (navLinksWrap) navLinksWrap.classList.remove('open');
+            if (toggle) toggle.classList.remove('open');
+
             const sectionId = link.dataset.section;
             if (!sectionId) return; // Allow normal navigation if no data-section exists
 
@@ -789,14 +792,24 @@ function initNavigation() {
             if (target) {
                 e.preventDefault();
                 target.scrollIntoView({ behavior: 'smooth' });
-                if (navLinksWrap) navLinksWrap.classList.remove('open');
             }
         });
     });
 
-    if (toggle) {
-        toggle.addEventListener('click', () => {
-            navLinksWrap.classList.toggle('open');
+    if (toggle && navLinksWrap) {
+        toggle.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isOpen = navLinksWrap.classList.toggle('open');
+            toggle.classList.toggle('open', isOpen);
+            toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        });
+
+        document.addEventListener('click', (e) => {
+            if (nav && !nav.contains(e.target)) {
+                navLinksWrap.classList.remove('open');
+                toggle.classList.remove('open');
+                toggle.setAttribute('aria-expanded', 'false');
+            }
         });
     }
 
