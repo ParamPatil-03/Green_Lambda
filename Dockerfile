@@ -20,6 +20,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Copy frontend website files
+COPY index.html dashboard.html connect.html analyze.html login.html runtime-test.html script.js style.css supabaseClient.js ./
+COPY figures/ ./figures/
+
 # Copy backend application and models
 COPY backend/ ./backend/
 COPY ml_model/ ./ml_model/

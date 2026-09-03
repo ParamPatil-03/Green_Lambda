@@ -17,7 +17,6 @@ backend/aws_session.json
 node_modules/
 *.zip
 *.bat
-figures/
 benchmarks/
 benchmarks_v2/
 

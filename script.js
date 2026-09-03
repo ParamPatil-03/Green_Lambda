@@ -1273,7 +1273,7 @@ const GREENLAMBDA_KEYS = {
 // API Configuration
 const API_BASE_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
     ? 'http://localhost:5000'
-    : 'https://your-production-api.railway.app';
+    : window.location.origin;
 
 const DEMO_KEY = 'DEMO-MODE-ONLY';
 

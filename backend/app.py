@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import os
 import sys
@@ -259,6 +259,11 @@ def prepare_features(fn_name):
     return X_single, row, is_fallback
 
 @app.route('/', methods=['GET'])
+@limiter.exempt
+def serve_index():
+    """Serve the landing page website UI."""
+    return send_from_directory(BASE_DIR, 'index.html')
+
 @app.route('/health', methods=['GET'])
 @limiter.exempt
 def health_check():
@@ -269,6 +274,15 @@ def health_check():
         "version": "v3.0.0",
         "models_loaded": list(models.keys()) if isinstance(models, dict) else []
     }), 200
+
+@app.route('/<path:filename>', methods=['GET'])
+@limiter.exempt
+def serve_static(filename):
+    """Serve frontend static files (HTML, JS, CSS, figures)."""
+    target_path = os.path.join(BASE_DIR, filename)
+    if os.path.isfile(target_path):
+        return send_from_directory(BASE_DIR, filename)
+    return jsonify({"status": "error", "message": "File not found"}), 404
 
 @app.route('/connect-aws', methods=['POST'])
 @limiter.limit("10 per minute")
